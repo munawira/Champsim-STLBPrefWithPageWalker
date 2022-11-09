@@ -303,6 +303,322 @@ void signal_handler(int signal)
   exit(1);
 }
 
+
+/////////////////////////////////////////////////////
+//ADDED BY MUNAWIRA
+
+
+
+void add_stall_prefetch(int cycles, uint32_t cpu){
+	stall_cycle[cpu] = current_core_cycle[cpu] + cycles;
+}
+
+uint64_t va_to_pa_prefetch(uint32_t cpu, uint64_t va, uint64_t unique_vpage){
+#ifdef SANITY_CHECK
+	if (va == 0)
+		assert(0);
+#endif
+	uint64_t high_bit_mask = rotr64(cpu, lg2(NUM_CPUS)),
+		 unique_va = va | high_bit_mask;
+	uint64_t vpage = unique_vpage | high_bit_mask,
+		 voffset = unique_va & ((1<<LOG2_PAGE_SIZE) - 1);
+
+	uint64_t random_ppage;
+
+	map <uint64_t, uint64_t>::iterator pr = page_table.begin();
+	map <uint64_t, uint64_t>::iterator ppage_check = inverse_table.begin();
+
+
+	map <uint64_t, uint64_t>::iterator cl_check = unique_cl[cpu].find(unique_va >> LOG2_BLOCK_SIZE);
+	if (cl_check == unique_cl[cpu].end()) { 
+		unique_cl[cpu].insert(make_pair(unique_va >> LOG2_BLOCK_SIZE, 0));
+		num_cl[cpu]++;
+	}
+	else
+		cl_check->second++;
+
+	pr = page_table.find(vpage);
+	if (pr == page_table.end()){
+		return 0;
+	}
+	else{
+		uint64_t ppage = pr->second;
+		uint64_t pa = ppage << LOG2_PAGE_SIZE;
+		pa |= voffset;
+		return pa;
+	}
+} 
+
+int mmu_cache_prefetch_search(uint32_t cpu, uint64_t vpage, int swap, uint64_t instr_id, uint64_t ip, int type, int iflag){
+
+	int mmu_hit[3] = {0,0,0};
+	uint64_t compare_pml4, compare_pdp, compare_pd;
+
+	uint64_t cstall = 2;
+	ooo_cpu[cpu].STLB.mmu_timer++;
+
+	mmu_hit[0] = ooo_cpu[cpu].STLB.search_pml4(compare_pml4);
+	mmu_hit[1] = ooo_cpu[cpu].STLB.search_pdp(compare_pdp);
+	if(LOG2_PAGE_SIZE == 12)
+		mmu_hit[2] = ooo_cpu[cpu].STLB.search_pd(compare_pd);
+
+	if (mmu_hit[2] && iflag)
+		ooo_cpu[cpu].STLB.mmu_cache_prefetch_hits[2]++;
+	else if (mmu_hit[1] && iflag)
+		ooo_cpu[cpu].STLB.mmu_cache_prefetch_hits[1]++;
+	else if (mmu_hit[0] && iflag)
+		ooo_cpu[cpu].STLB.mmu_cache_prefetch_hits[0]++;
+	else if (iflag)
+		ooo_cpu[cpu].STLB.mmu_cache_prefetch_hits[3]++;
+	else
+		int unknown = 0;
+
+	if (swap == 0){
+		ooo_cpu[cpu].STLB.lru_pml4(ooo_cpu[cpu].STLB.mmu_timer, compare_pml4);
+		ooo_cpu[cpu].STLB.lru_pdp(ooo_cpu[cpu].STLB.mmu_timer, compare_pdp);
+		if(LOG2_PAGE_SIZE == 12)
+			ooo_cpu[cpu].STLB.lru_pd(ooo_cpu[cpu].STLB.mmu_timer, compare_pd);
+
+		uint64_t cr3 = 0x200000;
+
+		uint64_t pt_index, pd_index, pdp_index, pml4_index;
+
+		if(LOG2_PAGE_SIZE == 12){
+			pt_index   = (vpage & 0x00000000001ff);
+			pd_index   = ((vpage>>9) & 0x00000000001ff);
+			pdp_index  = ((vpage>>18) & 0x00000000001ff);
+			pml4_index = ((vpage>>27) & 0x00000000001ff);
+		}
+		else{
+			pt_index   = (vpage & 0x00000000001ff);
+			pdp_index  = ((vpage>>9) & 0x00000000001ff);
+			pml4_index = ((vpage>>18) & 0x00000000001ff);
+		}
+
+		uint64_t pml42s, pdp2s, pd2s, pt2s;
+
+		if(LOG2_PAGE_SIZE == 12){
+			pml42s = cr3 + pml4_index * 8;
+
+			pdp2s  = cr3 + 512 * 8 \
+				 + pml4_index * 512 * 8 \
+				 + pdp_index * 8;
+
+			pd2s = cr3 + 512 * 8 \
+			       + 512 * 512 * 8 \
+			       + pml4_index * 512 * 512 * 8 \
+			       + pdp_index * 512 * 8 \
+			       + pd_index * 8;
+
+			pt2s = cr3 + 512 * 8 \
+			       + 512 * 512 * 8 \
+			       + 512 * 512 * 512 * 8 \
+			       + pml4_index * 512 * 512 * 512 * 8 \
+			       + pdp_index * 512 * 512 * 8 \
+			       + pd_index * 512 * 8\
+			       + pt_index * 8;
+		}
+		else{
+			pml42s = cr3 + pml4_index * 8;
+
+			pdp2s  = cr3 + 512 * 8 \
+				 + pml4_index * 512 * 8 \
+				 + pdp_index * 8;
+
+			pt2s = cr3 + 512 * 8 \
+			       + 512 * 512 * 8 \
+			       + pml4_index * 512 * 512 * 8 \
+			       + pdp_index * 512 * 8 \
+			       + pt_index * 8;
+		}
+
+		uint32_t set, way_fill;
+		int way_read;
+
+		int debug = 0;
+
+		if(debug)
+			cout << "\nNEW PAGE WALK " << endl;
+		int asap = 0;
+		if(!asap){
+			if(mmu_hit[0] == 0){
+				PACKET search_packet;
+				search_packet.address = pml42s;
+
+				set = ooo_cpu[cpu].L1D.get_set(pml42s);
+				way_read = ooo_cpu[cpu].L1D.check_hit(&search_packet);
+				if(way_read >=0){
+					if (iflag)
+						ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[0][0]++;
+					cstall += L1D_LATENCY;
+				}
+				else{
+					cstall += L1D_LATENCY;
+
+					set = ooo_cpu[cpu].L2C.get_set(pml42s);
+					way_read = ooo_cpu[cpu].L2C.check_hit(&search_packet);
+					if(way_read >=0){
+						if (iflag)
+							ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[0][1]++;
+						cstall += L2C_LATENCY;
+					}
+					else{
+						cstall += L2C_LATENCY;
+
+						set = uncore.LLC.get_set(pml42s);
+						way_read = uncore.LLC.check_hit(&search_packet);
+						if(way_read >=0){
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[0][2]++;
+							cstall += LLC_LATENCY;
+						}
+						else{
+							cstall += LLC_LATENCY;
+
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[0][3]++;
+							cstall += 200;
+						}
+					}
+				}
+			}
+
+			if(mmu_hit[1] == 0){
+				PACKET search_packet;
+				search_packet.address = pdp2s;
+
+				set = ooo_cpu[cpu].L1D.get_set(pdp2s);
+				way_read = ooo_cpu[cpu].L1D.check_hit(&search_packet);
+				if(way_read >=0){
+					if (iflag)
+						ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[1][0]++;
+					cstall += L1D_LATENCY;
+				}
+				else{
+					cstall += L1D_LATENCY;
+					set = ooo_cpu[cpu].L2C.get_set(pdp2s);
+					way_read = ooo_cpu[cpu].L2C.check_hit(&search_packet);
+					if(way_read >=0){
+						if (iflag)
+							ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[1][1]++;
+						cstall+=L2C_LATENCY;
+					}
+					else{
+						cstall += L2C_LATENCY;
+
+						set = uncore.LLC.get_set(pdp2s);
+						way_read = uncore.LLC.check_hit(&search_packet);
+						if(way_read >=0){
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[1][2]++;
+							cstall += LLC_LATENCY;
+						}
+						else{
+							cstall += LLC_LATENCY;
+
+							cstall += 200;
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[1][3]++;
+						}
+					}
+				}
+			}
+
+			if((mmu_hit[2] == 0) && (LOG2_PAGE_SIZE==12)){
+				PACKET search_packet;
+				search_packet.address = pd2s;
+
+				set = ooo_cpu[cpu].L1D.get_set(pd2s);
+				way_read = ooo_cpu[cpu].L1D.check_hit(&search_packet);
+				if(way_read >=0){
+					if (iflag)
+						ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[2][0]++;
+					cstall += L1D_LATENCY;
+				}
+				else{
+					cstall += L1D_LATENCY;
+
+					set = ooo_cpu[cpu].L2C.get_set(pd2s);
+					way_read = ooo_cpu[cpu].L2C.check_hit(&search_packet);
+					if(way_read >=0){
+						if (iflag)
+							ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[2][1]++;
+						cstall+=L2C_LATENCY;
+					}
+					else{
+						cstall += L2C_LATENCY;
+
+						set = uncore.LLC.get_set(pd2s);
+						way_read = uncore.LLC.check_hit(&search_packet);
+						if(way_read >=0){
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[2][2]++;
+							cstall += LLC_LATENCY;
+						}
+						else{
+							cstall += LLC_LATENCY;
+
+							cstall += 200;
+							if (iflag)
+								ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[2][3]++;
+						}
+					}
+				}
+			}
+		}
+		if(0 == 0){
+			PACKET search_packet;
+			search_packet.address = pt2s;
+
+			set = ooo_cpu[cpu].L1D.get_set(pt2s);
+			way_read = ooo_cpu[cpu].L1D.check_hit(&search_packet);
+			if(way_read >=0){
+				if (iflag)
+					ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[3][0]++;
+					cstall += L1D_LATENCY;
+			}
+			else{
+				cstall += L1D_LATENCY;
+
+				set = ooo_cpu[cpu].L2C.get_set(pt2s);
+				way_read = ooo_cpu[cpu].L2C.check_hit(&search_packet);
+				if(way_read >=0){
+					if (iflag)
+						ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[3][1]++;
+					cstall+=L2C_LATENCY;
+				}
+				else{
+					cstall += L2C_LATENCY;
+
+					set = uncore.LLC.get_set(pt2s);
+					way_read = uncore.LLC.check_hit(&search_packet);
+					if(way_read >=0){
+						if (iflag)
+							ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[3][2]++;
+						cstall += LLC_LATENCY;
+					}
+					else{
+						cstall += LLC_LATENCY;
+
+						if (iflag)
+							ooo_cpu[cpu].STLB.pagetable_mr_hit_ratio[3][3]++;
+						cstall += 200;
+					}
+				}
+			}
+		}
+	}
+
+	return cstall;
+}
+
+
+
+
+//ADDED BY MUNAWIRA
+////////////////////////////////////////
+
+
 int main(int argc, char** argv)
 {
   // interrupt signal hanlder

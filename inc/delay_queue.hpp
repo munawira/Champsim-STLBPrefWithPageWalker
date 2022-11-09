@@ -37,6 +37,7 @@ namespace champsim
  * If no bandwidth constraints are needed, the terminal condition can simply be
  *`it != dq.end_ready()`.
  ***/
+
 template <typename T>
 class delay_queue
 {

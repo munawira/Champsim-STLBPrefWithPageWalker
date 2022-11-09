@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <bits/stdc++.h>
 
 #include "champsim.h"
 #include "champsim_constants.h"
@@ -14,6 +15,406 @@
 
 extern VirtualMemory vmem;
 extern uint8_t warmup_complete[NUM_CPUS];
+
+
+////////////////////////////////////////////////
+//ADDED below BY MUNAWIRA FOR MORRIGAN PREFETCHER
+
+void CACHE::print_fctb(){
+	for(int i=0; i<FCTB_SIZE; i++)
+		cout << hex << fctb[i][0] << ", " <<  dec << fctb[i][1] << ", " << fctb[i][2] << ", " << fctb[i][3] << endl;
+}
+
+
+
+int CACHE::search_fctb(uint64_t current_vpn){
+	int fctb_found_pos = -10, acc;
+	for(int f=0; f<FCTB_SIZE; f++){ 
+		if(fctb[f][0] == current_vpn)
+			return f;
+
+		for(int t=1; t<=fctb[f][1]; t++){
+			if((fctb[f][0]-t) == current_vpn)
+				return f;
+		}
+
+		acc = 1;
+		for(int t=fctb[f][1]+1; t<8; t++){
+			if((fctb[f][0]+acc) == current_vpn)
+				return f;
+			acc++;
+		}
+	}
+	return -10;
+}
+
+
+int CACHE::fctb_replacement_policy(){
+	uint64_t lru_min = fctb[0][2];
+	int lru_victim = 0;
+	for(int f=1; f<FCTB_SIZE; f++){
+		if(fctb[f][2] < lru_min){
+			lru_min = fctb[f][2];
+			lru_victim = f;
+		}
+	}
+	return lru_victim;
+}
+
+void CACHE::refresh_fctb(uint64_t current_cycle){
+	for(int f=0; f<FCTB_SIZE; f++){
+		//if((current_cycle - fctb[f][2]) > PAGE_TABLE_LATENCY)
+		if(current_cycle > 1*(fctb[f][2] + fctb[f][3])){
+			fctb[f][0] = 0;
+			fctb[f][1] = 0;
+			fctb[f][2] = 0;
+			fctb[f][3] = 0;
+		}
+	}
+}
+
+int * CACHE::sorted_free_distances(){
+	/*
+	   uint64_t sorted_table[14];
+
+	   for(int i=0; i<14; i++)
+	   sorted_table[i] = free_distance_table[i];
+
+	   int n = sizeof(sorted_table)/sizeof(sorted_table[0]);
+
+	   sort(sorted_table, sorted_table+n);
+
+	//for(int i=0; i<14; i++){
+	//    cout << sorted_table[i] << ", ";
+	//}
+	//cout << endl;
+	*/
+
+	/* pair sort */
+	int n = sizeof(free_distance_table)/sizeof(free_distance_table[0]);
+	pair<uint64_t, int> * pairf;
+	pairf = (pair<uint64_t, int>*) malloc(14*sizeof( pair<uint64_t, int>));
+
+	for(int i=0; i<14; i++){
+		pairf[i].second = i - 6;
+		if(i <= 6)
+			pairf[i].second--;
+		pairf[i].first = free_distance_table[i];
+	}
+
+	sort(pairf, pairf+n);
+
+	/*
+	   for(int i=0; i<14; i++){
+	   cout << pairf[i].first << ", ";
+	   }
+	   cout << endl;
+	   for(int i=0; i<14; i++){
+	   cout << pairf[i].second << ", ";
+	   }
+	   */
+
+	int * indexes;
+	indexes = (int *) malloc(14*sizeof(int));
+	for(int i=0; i<14; i++){
+		indexes[i] = pairf[i].second;
+	}
+
+	free(pairf);
+
+	return indexes;
+
+	//return pairf;
+}
+
+
+
+void CACHE::print_pml4(){
+	for(int s=0; s<PML4_SET; s++){
+		for(int w=0; w<PML4_WAY; w++)
+			cout << pml4[s][w] << ", " << pml4_lru[s][w];
+		cout << endl;
+	}
+}
+
+void CACHE::print_pdp(){
+	for(int s=0; s<PDP_SET; s++){
+		for(int w=0; w<PDP_WAY; w++)
+			cout << pdp[s][w] << ", " << pdp_lru[s][w];
+		cout << endl;
+	}
+}
+
+void CACHE::print_pd(){
+	for(int s=0; s<PD_SET; s++){
+		for(int w=0; w<PD_WAY; w++)
+			cout << pd[s][w] << ", " << pd_lru[s][w] << " ;; ";
+		cout << endl;
+	}
+}
+
+int CACHE::search_pml4(uint64_t address){
+	for(int s=0; s<PML4_SET; s++){
+		for(int w=0; w<PML4_WAY; w++){
+			if(pml4[s][w] == address)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+int CACHE::search_pdp(uint64_t address){
+	for(int s=0; s<PDP_SET; s++){
+		for(int w=0; w<PDP_WAY; w++){
+			if(pdp[s][w] == address)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+int CACHE::search_pd(uint64_t address){
+	for(int s=0; s<PD_SET; s++){
+		for(int w=0; w<PD_WAY; w++){
+			if(pd[s][w] == address)
+				return 1;
+		}
+	}
+	return 0;
+}
+
+void CACHE::lru_pml4(uint64_t timer, uint64_t address){
+	for(int s=0; s<PML4_SET; s++){
+		for(int w=0; w<PML4_WAY; w++){
+			if(pml4[s][w] == address){
+				pml4_lru[s][w] = timer;
+				return;
+			}
+		}
+	}
+
+	uint64_t min = pml4_lru[0][0];
+	int victim[2] = {0,0};
+
+	for(int s=0; s<PML4_SET; s++){
+		for(int w=0; w<PML4_WAY; w++){
+			if(pml4_lru[s][w] < min){
+				min = pml4_lru[s][w];
+				victim[0] = s;
+				victim[1] = w;
+			}
+		}
+	}
+
+	pml4[victim[0]][victim[1]] = address;
+	pml4_lru[victim[0]][victim[1]] = timer;
+	return;
+}
+
+
+void CACHE::lru_pdp(uint64_t timer, uint64_t address){
+	for(int s=0; s<PDP_SET; s++){
+		for(int w=0; w<PDP_WAY; w++){
+			if(pdp[s][w] == address){
+				pdp_lru[s][w] = timer;
+				return;
+			}
+		}
+	}
+
+	uint64_t min = pdp_lru[0][0];
+	int victim[2] = {0,0};
+
+	for(int s=0; s<PDP_SET; s++){
+		for(int w=0; w<PDP_WAY; w++){
+			if(pdp_lru[s][w] < min){
+				min = pdp_lru[s][w];
+				victim[0] = s;
+				victim[1] = w;
+			}
+		}
+	}
+
+	pdp[victim[0]][victim[1]]      = address;
+	pdp_lru[victim[0]][victim[1]]  = timer;
+	return;
+}
+void CACHE::lru_pd(uint64_t timer, uint64_t address){
+	int bits = ceil(log2(PD_SET));
+	int index = address & ((1<<bits)-1);
+	//cout << "Index: " << index << endl;
+
+	for(int w=0; w<PD_WAY; w++){
+		if(pd[index][w] == address){
+			pd_lru[index][w] = timer;
+			return;
+		}
+	}
+
+	uint64_t min = pd_lru[index][0];
+	int victim[2] = {index,0};
+
+	for(int w=0; w<PD_WAY; w++){
+		if(pd_lru[index][w] < min){
+			min = pd_lru[index][w];
+			victim[0] = index;
+			victim[1] = w;
+		}
+	}
+
+	pd[victim[0]][victim[1]]      = address;
+	pd_lru[victim[0]][victim[1]]  = timer;
+
+	return;
+}
+
+
+int compare (const void * a, const void * b)
+{
+	return ( *(int*)a - *(int*)b );
+}
+
+
+uint64_t l2pf_access = 0;
+
+	int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int fill_level, int pq_id, int free, int update_free, int free_distance, uint64_t id, int type, int iflag, int lad, int confidence, int irip)
+	{
+		int index, debug = 0, flag = 0, fctb_search = -10;
+		uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
+
+		if(!free)
+			fctb_search = search_fctb(pf_addr);
+
+		if(pq_id == 0){
+			pf_requested++;
+			pf_total_pq++;
+		}
+
+		if(pq_id == 0){
+			index = PQ.check_queue_vpn(pf_addr).first;
+		}
+		else{
+			cout << "I am using only one PQ" << endl;
+		}
+
+		if(temp){
+			if(pq_id != 2){
+				if(index != -1){
+					if(debug)
+						cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
+					return 0;
+				}
+			}
+
+			PACKET pf_packet;
+			pf_packet.data_pa = temp;
+
+			if(pq_id == 0){
+				if (PQ.occupancy == PQ.SIZE){
+					uint64_t removed_vpn = PQ.remove_queue_lru();
+				}
+			}
+			else{
+				cout << "I am using only one PQ" << endl;
+			}
+
+			pf_packet.fill_level = fill_level;
+			pf_packet.cpu = cpu;
+			pf_packet.data = temp;
+			pf_packet.address = pf_addr;
+			pf_packet.full_addr = base_addr;
+			pf_packet.ip = ip;
+			pf_packet.type = 0xdeadbeef;
+			pf_packet.event_cycle = current_core_cycle[cpu];
+			pf_packet.free_bit = free;
+			pf_packet.free_distance = free_distance;
+			pf_packet.lad = lad;
+			pf_packet.conf = confidence;
+			pf_packet.irip = irip;
+
+			if(fctb_search == -10){
+				fctb_misses++;
+				pf_packet.event_cycle = current_core_cycle[cpu];
+				pf_packet.free_bit = free;
+			}
+			else{
+				fctb_hits++;
+				pf_packet.event_cycle = fctb[fctb_search][2];
+				pf_packet.free_bit = 1;
+			}
+
+			if(free){
+				if(lad == 0)
+					pf_free++;
+				pf_packet.stall_cycles = 100;
+			}
+			else{
+				if(fctb_search != -10){
+					pf_free++;
+					pf_packet.stall_cycles = fctb[fctb_search][3];
+				}
+				else{
+					pf_real++;
+					int stall_cycles = mmu_cache_prefetch_search(cpu, pf_addr, 0, id, ip, type, iflag);
+					pf_packet.stall_cycles = stall_cycles;
+
+					int victim_entry = fctb_replacement_policy();
+					fctb[victim_entry][0] = pf_addr;
+					fctb[victim_entry][1] = (pf_addr & 0x07);
+					fctb[victim_entry][2] = current_core_cycle[cpu];
+					fctb[victim_entry][3] = stall_cycles;
+				}
+			}
+      
+			if(P2TLB){
+				if(IS_STLB){
+					uint32_t set = get_set(pf_addr);
+					uint32_t way = get_way(pf_addr, set);
+
+					way = find_victim(cpu, 0xdeadbeef, set, block[set], 0xdeadbeef, 0xdeadbeef, 0xdeadbeef);
+
+					update_replacement_state(cpu, set, way, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, WRITEBACK, 1);
+
+					block[set][way].valid = 1;
+
+					block[set][way].dirty = 0;
+					block[set][way].prefetch = 1;
+					block[set][way].used = 0;
+
+					block[set][way].tag = pf_addr;
+					block[set][way].address = pf_addr;
+					block[set][way].full_addr = 0xdeadbeef; 
+					block[set][way].data = temp;
+					block[set][way].cpu = cpu;
+					block[set][way].stalls = pf_packet.event_cycle + pf_packet.stall_cycles;
+				}
+
+				return 1;
+			}
+
+
+			if(pq_id == 0)
+				add_pq(&pf_packet);
+			else
+				cout << "I am using only one PQ" << endl;
+
+			if(lad == 1)
+				issued_prefetches_lad++;
+
+			pf_issued++;
+			return 1;
+		}
+		else{
+			if(pq_id == 0)
+				pf_swap++;
+			return 0;
+		}
+	}
+
+
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+////////////////////////////////////////////////	
+
 
 void CACHE::handle_fill()
 {
@@ -177,7 +578,7 @@ void CACHE::readlike_hit(std::size_t set, std::size_t way, PACKET& handle_pkt)
 
   handle_pkt.data = hit_block.data;
 
-  // update prefetcher on load instruction
+  // update prefetcher on load instruction //MUNA QUESTION: ANYTHING TO DO HERE
   if (should_activate_prefetcher(handle_pkt.type) && handle_pkt.pf_origin_level < fill_level) {
     cpu = handle_pkt.cpu;
     uint64_t pf_base_addr = (virtual_prefetch ? handle_pkt.v_address : handle_pkt.address) & ~bitmask(match_offset_bits ? 0 : OFFSET_BITS);
@@ -192,7 +593,7 @@ void CACHE::readlike_hit(std::size_t set, std::size_t way, PACKET& handle_pkt)
   sim_access[handle_pkt.cpu][handle_pkt.type]++;
 
   for (auto ret : handle_pkt.to_return)
-    ret->return_data(&handle_pkt);
+    ret->return_data(&handle_pkt); //MUNA: Return data from Cache 
 
   // update prefetch stats and reset prefetch bit
   if (hit_block.prefetch) {
@@ -261,8 +662,130 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
     else
       handle_pkt.to_return.clear();
 
-    if (!is_read)
+    if (!is_read){
       lower_level->add_pq(&handle_pkt);
+
+      if(this->NAME == "STLB"){ //MUNA: BELOW ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+        uint64_t pa, current_vpn = handle_pkt.v_address ;
+			int bits, rowhit=-1, victim, iflag = 0;
+			pair<int, int> answer;
+
+			int * free_indexes;
+			free_indexes = sorted_free_distances();
+
+			if(unsigned(handle_pkt.instruction) != 0){
+				stlb_misses[1]++;
+				iflag = 1;
+				decay_timer++;
+				decay_conf_timer++;
+				instr_trans_miss++;
+				handle_pkt.is_instr_addr =1;
+				handle_pkt.is_data_addr =0;
+
+			}
+			else{
+				stlb_misses[0]++;
+				data_trans_miss++;
+
+				handle_pkt.is_instr_addr =0;
+				handle_pkt.is_data_addr =1;
+			}
+
+			int fctb_found_pos = -10;
+			if(iflag == 1){
+				refresh_fctb(current_cycle);
+				fctb_found_pos = search_fctb(handle_pkt.v_address);
+				answer = check_hit_stlb_pq(handle_pkt.v_address);
+			}
+			else{
+				answer = make_pair(-1,-1);
+			}
+/*
+			pair<uint64_t, uint64_t> v2p;
+			if(answer.first == -1){
+				if(iflag){
+					if(fctb_found_pos == -10){
+						v2p = vmem.va_to_pa(cpu, handle_pkt.v_address);
+						pa = v2p.first;
+						int victim_entry = fctb_replacement_policy();
+						fctb[victim_entry][0] = current_vpn;
+						fctb[victim_entry][1] = (handle_pkt.v_address & 0x7000)/4096;
+						fctb[victim_entry][2] = current_cycle;
+						fctb[victim_entry][3] = v2p.second;-
+
+					}
+					else{
+						pa = va_to_pa_prefetch(cpu, RQ.entry[index].full_addr, RQ.entry[index].address);
+						if(pa == 0){
+							v2p = va_to_pa(read_cpu, RQ.entry[index].instr_id, RQ.entry[index].full_addr, RQ.entry[index].address, RQ.entry[index].ip, RQ.entry[index].type, iflag, 0);
+							pa = v2p.first;
+						}
+					}
+				}
+				else{
+					v2p = va_to_pa(read_cpu, RQ.entry[index].instr_id, RQ.entry[index].full_addr, RQ.entry[index].address, RQ.entry[index].ip, RQ.entry[index].type, iflag, 0);
+					pa  = v2p.first;
+				}
+				if (iflag == 1 || DSTLB == 1)
+					pf_misses_pq++;
+			}
+			else{
+				if(PQ.entry[answer.first].free_bit == 1 && PQ.entry[answer.first].free_distance != 0){
+					rfhits[1]++;
+					free_hits[PQ.entry[answer.first].free_distance + 6 + (PQ.entry[answer.first].free_distance < 0)*1]++;
+				}
+				else
+					rfhits[0]++;
+
+				if (warmup_complete[cpu]){
+					uint64_t num_cycles;
+
+					if(PQ.entry[answer.first].irip)
+						irip_hits++;
+					else
+						sdp_hits++;
+
+					if(answer.second == 0){
+						num_cycles = current_core_cycle[read_cpu] - PQ.return_event_cycle(answer.first);
+						if (num_cycles < PQ.entry[answer.first].stall_cycles){
+							add_stall_prefetch(PQ.entry[answer.first].stall_cycles - num_cycles, read_cpu);
+						}
+					}
+					else{
+						cout << "you should not be here since we are using only one PQ" << endl;
+					}
+				}
+
+				if(answer.second == 0){
+					pa = PQ.entry[answer.first].data;
+					if(PQ.entry[answer.first].lad == 1)
+						hit_prefetches_lad++;
+					PQ.remove_queue_prefetch(&PQ.entry[answer.first], answer.first);
+				}
+				else{
+					cout << "you should not be here since we are using only one PQ" << endl;
+				}
+
+				pf_hits_pq++;
+
+			}
+
+			RQ.entry[index].data = pa >> LOG2_PAGE_SIZE; 
+			RQ.entry[index].event_cycle = current_core_cycle[read_cpu];
+			return_data(&RQ.entry[index]);
+
+			if(iflag == 1){
+				free_indexes = sorted_free_distances();
+				stlb_prefetcher_operate(RQ.entry[index].address, RQ.entry[index].ip, 0, RQ.entry[index].type, answer.first, warmup_complete[cpu], free_indexes, RQ.entry[index].instr_id, iflag);
+				stlb_prefetcher_cache_fill(RQ.entry[index].address, 0, 0, 0, 0);
+			}
+
+			//Added by Munawira to support Data + Inst Prefetcher at STLB
+			//dstlb_prefetcher_operate(RQ.entry[index].address, RQ.entry[index].ip, 0, RQ.entry[index].type, answer.first, warmup_complete[cpu], free_indexes, RQ.entry[index].instr_id, iflag);
+			//dstlb_prefetcher_cache_fill(RQ.entry[index].address, 0, 0, 0, 0)
+      }*/  //MUNA: ABOVE ADDED BY MUNAWIRA    
+    }
+      
     else
       lower_level->add_rq(&handle_pkt);
   }
@@ -512,6 +1035,159 @@ int CACHE::add_wq(PACKET* packet)
 
   return WQ.occupancy();
 }
+
+//MUNA: BELOW CODE ADDED FOR MORRIGAN
+	pair<int, int> CACHE::check_hit_stlb_pq(uint64_t vpn){
+		/* In case of hit in a PQ, we return a tuple with the position of the found translation and the identifier of the corresponding PQ */
+		pair<int, uint64_t> temp_pair  = PQ.check_queue_vpn(vpn);
+		pair<int, int> return_pair;
+
+		if(temp_pair.first == -1){
+			return_pair = make_pair(-1, -1);
+		}
+		else
+			return_pair = make_pair(temp_pair.first,0);
+
+		return return_pair;
+	}
+//MUNA: ABOVE CODE ADDED FOR MORRIGAN
+
+//MUNA: BELOW ADDED FOR MORRIGAN PREFETCHER
+	int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int fill_level, int pq_id, int free, int update_free, int free_distance, uint64_t id, int type, int iflag, int lad, int confidence, int irip)
+	{
+		int index, debug = 0, flag = 0, fctb_search = -10;
+		uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
+
+		if(!free)
+			fctb_search = search_fctb(pf_addr);
+
+		if(pq_id == 0){
+			pf_requested++;
+			pf_total_pq++;
+		}
+
+		if(pq_id == 0){
+			index = PQ.check_queue_vpn(pf_addr).first;
+		}
+		else{
+			cout << "I am using only one PQ" << endl;
+		}
+
+		if(temp){
+			if(pq_id != 2){
+				if(index != -1){
+					if(debug)
+						cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
+					return 0;
+				}
+			}
+
+			PACKET pf_packet;
+			pf_packet.data_pa = temp;
+
+			if(pq_id == 0){
+				if (PQ.occupancy == PQ.SIZE){
+					uint64_t removed_vpn = PQ.remove_queue_lru();
+				}
+			}
+			else{
+				cout << "I am using only one PQ" << endl;
+			}
+
+			pf_packet.fill_level = fill_level;
+			pf_packet.cpu = cpu;
+			pf_packet.data = temp;
+			pf_packet.address = pf_addr;
+			pf_packet.full_addr = base_addr;
+			pf_packet.ip = ip;
+			pf_packet.type = 0xdeadbeef;
+			pf_packet.event_cycle = current_core_cycle[cpu];
+			pf_packet.free_bit = free;
+			pf_packet.free_distance = free_distance;
+			pf_packet.lad = lad;
+			pf_packet.conf = confidence;
+			pf_packet.irip = irip;
+
+			if(fctb_search == -10){
+				fctb_misses++;
+				pf_packet.event_cycle = current_core_cycle[cpu];
+				pf_packet.free_bit = free;
+			}
+			else{
+				fctb_hits++;
+				pf_packet.event_cycle = fctb[fctb_search][2];
+				pf_packet.free_bit = 1;
+			}
+
+			if(free){
+				if(lad == 0)
+					pf_free++;
+				pf_packet.stall_cycles = 100;
+			}
+			else{
+				if(fctb_search != -10){
+					pf_free++;
+					pf_packet.stall_cycles = fctb[fctb_search][3];
+				}
+				else{
+					pf_real++;
+					int stall_cycles = mmu_cache_prefetch_search(cpu, pf_addr, 0, id, ip, type, iflag);
+					pf_packet.stall_cycles = stall_cycles;
+
+					int victim_entry = fctb_replacement_policy();
+					fctb[victim_entry][0] = pf_addr;
+					fctb[victim_entry][1] = (pf_addr & 0x07);
+					fctb[victim_entry][2] = current_core_cycle[cpu];
+					fctb[victim_entry][3] = stall_cycles;
+				}
+			}
+
+			if(P2TLB){
+				if(IS_STLB){
+					uint32_t set = get_set(pf_addr);
+					uint32_t way = get_way(pf_addr, set);
+
+					way = find_victim(cpu, 0xdeadbeef, set, block[set], 0xdeadbeef, 0xdeadbeef, 0xdeadbeef);
+
+					update_replacement_state(cpu, set, way, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, WRITEBACK, 1);
+
+					block[set][way].valid = 1;
+
+					block[set][way].dirty = 0;
+					block[set][way].prefetch = 1;
+					block[set][way].used = 0;
+
+					block[set][way].tag = pf_addr;
+					block[set][way].address = pf_addr;
+					block[set][way].full_addr = 0xdeadbeef; 
+					block[set][way].data = temp;
+					block[set][way].cpu = cpu;
+					block[set][way].stalls = pf_packet.event_cycle + pf_packet.stall_cycles;
+				}
+
+				return 1;
+			}
+
+
+			if(pq_id == 0)
+				add_pq(&pf_packet);
+			else
+				cout << "I am using only one PQ" << endl;
+
+			if(lad == 1)
+				issued_prefetches_lad++;
+
+			pf_issued++;
+			return 1;
+		}
+		else{
+			if(pq_id == 0)
+				pf_swap++;
+			return 0;
+		}
+	}
+//MUNA: ABOVE ADDED FOR MORRIGAN 
+
 
 int CACHE::prefetch_line(uint64_t pf_addr, bool fill_this_level, uint32_t prefetch_metadata)
 {

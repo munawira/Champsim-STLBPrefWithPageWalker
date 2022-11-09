@@ -5,12 +5,64 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <map>
 
 #include "champsim.h"
 #include "delay_queue.hpp"
 #include "memory_class.h"
 #include "ooo_cpu.h"
 #include "operable.h"
+
+
+//AADDED BY MUNAWIRA FOR MORRIGAN
+// PAGE  
+extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
+
+#define P2TLB 0
+
+// Free Prefetching
+
+// flag for demand page walks
+#define ENABLE_FP 0
+
+// flag for prefetch page walks
+#define ENABLE_PREF_FP 0
+
+// Lookahead Depth (0:disable)
+#define LA_DEPTH 0
+
+// Replacement Policy for Markov's prediction table --> [ 0:LRU, 1:LFU, 2:RANDOM, 3:... ]
+#define RP_MP 1
+
+// Number of prediction table entries you randomly select from for eviction in LFU replacement policy for the Markov instruction TLB prefetcher
+#define LLIMIT 5
+
+// Number of bits for the confidence counters of the RP_SUC_MP replacement policy
+#define CNF_BITS 3
+
+// Number of successors of Markov I-TLB Prefetcher
+#define SUCCESSORS 2
+
+// Replacement Policy for the successors of Markov's prediction table --> [ 0:FIFO, 1:RANDOM, 2:CUSTOM, 3:... ]
+#define RP_SUC_MP 2
+
+// Number of STLB instruction misses to reset frequency field of Markov Prefetcher used for the LFU policy
+#define RESET_FREQ 5000
+
+#define PML4_SET 2
+#define PDP_SET 4
+#define PD_SET 16
+
+#define PML4_WAY 1
+#define PDP_WAY 1
+#define PD_WAY 2
+
+
+#define FCTB_SIZE 4
+
+
+//AADDED BY MUNAWIRA FOR MORRIGAN
+//////////////////////////////////
 
 // virtual address space prefetching
 #define VA_PREFETCH_TRANSLATION_LATENCY 2
@@ -52,6 +104,66 @@ public:
 
   uint64_t total_miss_latency = 0;
 
+////////////////////////////////////////////////
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+uint64_t fctb[FCTB_SIZE][4];
+
+		uint64_t timer;
+
+		int selector;
+
+		map<uint64_t, uint64_t> code_footprint;
+		map<uint64_t, uint64_t>::iterator it;
+
+		// prefetch stats
+		uint64_t pf_hits_pq,
+			 pf_misses_pq,
+			 pf_swap,
+			 pf_dupli,
+			 pf_free,
+			 pf_real,
+			 previous_iva,
+			 previous_ip,
+			 fctb_hits,
+			 fctb_misses, 
+			 hit_prefetches_lad,
+			 issued_prefetches_lad,
+			 pf_total_pq,
+			 morrigan_filter_hits,
+			 irip_hits,
+			 sdp_hits,
+			 bpbp[5], // 0: # instruction prefetches 1: portion of instruction prefetches that are in the same page 2: portion of beyond page boundaries instruction prefetches 3: beyond page boundaries prefetches that hit in the TLB hierarchy 4: beyond page boundaries prefetches that miss in the TLB
+			 instr_miss, //Added by Munawira
+			 data_miss, //Added by Munawira
+			 instr_trans_miss, //Added by Munawira
+			 data_trans_miss; //Added by Munawira
+
+
+
+		uint64_t free_distance_table[14];
+
+		uint64_t pml4[PML4_SET][PML4_WAY], pdp[PDP_SET][PDP_WAY], pd[PD_SET][PD_WAY];
+		uint64_t pml4_lru[PML4_SET][PML4_WAY], pdp_lru[PDP_SET][PDP_WAY], pd_lru[PD_SET][PD_WAY];
+		uint64_t mmu_cache_demand_hits[4], mmu_cache_prefetch_hits[4];
+		uint64_t mmu_timer;
+
+		uint64_t pagetable_mr_hit_ratio[4][4];
+		uint64_t rfhits[2];
+		uint64_t free_hits[14];
+
+		uint64_t decay_timer;
+		uint64_t decay_conf_timer;
+
+		uint64_t stlb_misses[2]; // 0 is data, 1 is instruction
+
+		//functions
+		pair<int, int> check_hit_stlb_pq(uint64_t vpn);
+
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+////////////////////////////////////////////////
+
+
+
   // functions
   int add_rq(PACKET* packet) override;
   int add_wq(PACKET* packet) override;
@@ -88,6 +200,34 @@ public:
 
   void print_deadlock() override;
 
+
+////////////////////////////////////////////////
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+  void stlb_prefetcher_initialize(),
+    stlb_prefetcher_cache_fill(uint64_t addr, uint32_t set, uint32_t way, uint8_t prefetch, uint64_t evicted_addr),
+	  stlb_prefetcher_operate(uint64_t addr, uint64_t ip, uint8_t cache_hit, uint8_t type, int answer, int warmup, int * free_indexes, uint64_t instr_id, int iflag),
+    stlb_prefetcher_final_stats(uint64_t prefetches, uint64_t hits, uint64_t misses, uint64_t swap, uint64_t dupli, uint64_t free, uint64_t real, uint64_t *mmu_cache_demand_hits, uint64_t * mmu_cache_prefetch_hits, uint64_t * rfhits, uint64_t * free_hits, uint64_t mr[4][4], uint64_t stlb_misses[2]);
+
+	int  search_pml4(uint64_t address), search_pdp(uint64_t address), search_pd(uint64_t address);
+		void lru_pml4(uint64_t timer, uint64_t address), lru_pdp(uint64_t timer, uint64_t address), lru_pd(uint64_t timer, uint64_t address);
+		void print_pml4(), print_pdp(), print_pd();
+		void free_prefetching(uint64_t ip, uint64_t addr, int cache_line_position_n, uint64_t pf_addr, int * free_indexes, uint64_t instr_id, int type, int iflag);
+
+		// lookahead prefetching for Markov I-TLB Prefetcher
+		void lookahead_prefetching(uint64_t ip, uint64_t addr, uint64_t pf_addr, uint64_t instr_id, int type, int iflag, int depth);
+
+		// FCTB functions
+		int fctb_replacement_policy(), search_fctb(uint64_t current_vpn);
+		void print_fctb(), refresh_fctb(uint64_t current_cycle);
+
+    int prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int fill_level, int pq_id, int free, int update_free, int free_distance, uint64_t id, int type, int iflag, int lad, int confidence, int irip);
+    int * sorted_free_distances();
+	
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+////////////////////////////////////////////////		    	     
+
+
+
 #include "cache_modules.inc"
 
   const repl_t repl_type;
@@ -102,6 +242,101 @@ public:
         MAX_WRITE(max_write), prefetch_as_load(pref_load), match_offset_bits(wq_full_addr), virtual_prefetch(va_pref), pref_activate_mask(pref_act_mask),
         repl_type(repl), pref_type(pref)
   {
+
+
+////////////////////////////////////////////////
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+    // fctb initialization loop
+				for (uint32_t j=0; j<FCTB_SIZE; j++) {
+					fctb[j][0] = 0;
+					fctb[j][1] = 0;
+					fctb[j][2] = 0;
+					fctb[j][3] = 0;
+				}
+
+				for (int i=0; i<PML4_SET; i++){
+					for(int j=0; j<PML4_WAY; j++){
+						pml4[i][j] = 0;
+						pml4_lru[i][j] = 0;
+					}
+				}
+
+				for (int i=0; i<PDP_SET; i++){
+					for(int j=0; j<PDP_WAY; j++){
+						pdp[i][j] = 0;
+						pdp_lru[i][j] = 0;
+					}
+				}
+
+				for (int i=0; i<PD_SET; i++){
+					for(int j=0; j<PD_WAY; j++){
+						pd[i][j] = 0;
+						pd_lru[i][j] = 0;
+					}
+				}
+
+        				mmu_timer = 0;
+
+				for(int i=0; i<4; i++){
+					mmu_cache_demand_hits[i] = 0;
+					mmu_cache_prefetch_hits[i] = 0;
+				}
+
+				for(int i=0; i<4; i++){
+					for(int j=0; j<4; j++){
+						pagetable_mr_hit_ratio[i][j] = 0;
+					}
+				}
+
+				for(int i=0; i<14; i++){
+					free_hits[i] = 0;
+				}
+
+				rfhits[0] = 0;
+				rfhits[1] = 0;
+				decay_timer = 0;
+				timer = 0;
+
+				pf_hits_pq = 0;
+				pf_misses_pq = 0;
+				pf_swap = 0;
+				pf_dupli = 0;
+				pf_free = 0;
+				pf_real = 0;
+				previous_iva = 0;
+				previous_ip = 0;
+				stlb_misses[0] = 0;
+				stlb_misses[1] = 0;
+				fctb_hits = 0;
+				fctb_misses = 0;
+				issued_prefetches_lad = 0;
+				hit_prefetches_lad = 0;
+				pf_total_pq = 0;
+
+				selector = 0;
+
+				irip_hits = 0;
+				sdp_hits = 0;
+
+				bpbp[0] = 0;
+				bpbp[1] = 0;
+				bpbp[2] = 0;
+				bpbp[3] = 0;
+				bpbp[4] = 0;
+
+				morrigan_filter_hits = 0;
+
+        pf_requested = 0;
+				pf_issued = 0;
+				pf_useful = 0;
+				pf_useless = 0;
+				pf_fill = 0;
+
+
+
+
+//ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+////////////////////////////////////////////////
   }
 };
 
