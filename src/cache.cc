@@ -7,7 +7,7 @@
 #include "champsim_constants.h"
 #include "util.h"
 #include "vmem.h"
-#include <bits/stdc++.h>
+#include "bits/stdc++.h"
 
 #ifndef SANITY_CHECK
 #define NDEBUG
@@ -283,134 +283,100 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
                          uint64_t id, int type, int iflag, int lad, int confidence, int irip)
 {
   int index, debug = 0, flag = 0, fctb_search = -10;
-  // //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
+  bool vapq_full = false;
+  //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
 
-  // if(!free)
-  // 	fctb_search = search_fctb(pf_addr);
+  if(!free)
+  	fctb_search = search_fctb(pf_addr);
 
-  // if(pq_id == 0){
-  // 	pf_requested++;
-  // 	pf_total_pq++;
-  // }
+  if(pq_id == 0){
+  	pf_requested++;
+  	pf_total_pq++;
+  }
 
-  // if(pq_id == 0){
-  // 	index = PQ.check_queue_vpn(pf_addr).first;
-  // }
-  // else{
-  // 	cout << "I am using only one PQ" << endl;
-  // }
+  if(pq_id == 0){
+  	 auto vapq_entry = std::find_if(VAPQ.begin(), VAPQ.end(), eq_addr<PACKET>(base_addr, OFFSET_BITS));
+     vapq_full = (VAPQ.size() == PQ_SIZE);
+    if (vapq_entry == VAPQ.end())
+      index = -1;
+  }
+  else{
+  	cout << "I am using only one PQ" << endl;
+  }
 
-  // if(temp){
-  // 	if(pq_id != 2){
-  // 		if(index != -1){
-  // 			if(debug)
-  // 				cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
-  // 			return 0;
-  // 		}
-  // 	}
+  if(vapq_full){
+    return 0;
 
-  // 	PACKET pf_packet;
-  // 	pf_packet.data_pa = temp;
+  }
 
-  // 	if(pq_id == 0){
-  // 		if (PQ.occupancy == PQ.SIZE){
-  // 			uint64_t removed_vpn = PQ.remove_queue_lru();
-  // 		}
-  // 	}
-  // 	else{
-  // 		cout << "I am using only one PQ" << endl;
-  // 	}
+  if(pq_id != 2){
+    if(index != -1){
+      if(debug)
+        cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
+      return 0;
+    }
+  }
 
-  // 	pf_packet.fill_level = fill_level;
-  // 	pf_packet.cpu = cpu;
-  // 	pf_packet.data = temp;
-  // 	pf_packet.address = pf_addr;
-  // 	pf_packet.full_addr = base_addr;
-  // 	pf_packet.ip = ip;
-  // 	pf_packet.type = 0xdeadbeef;
-  // 	pf_packet.event_cycle = current_core_cycle[cpu];
-  // 	pf_packet.free_bit = free;
-  // 	pf_packet.free_distance = free_distance;
-  // 	pf_packet.lad = lad;
-  // 	pf_packet.conf = confidence;
-  // 	pf_packet.irip = irip;
+   	PACKET pf_packet;
 
-  // 	if(fctb_search == -10){
-  // 		fctb_misses++;
-  // 		pf_packet.event_cycle = current_core_cycle[cpu];
-  // 		pf_packet.free_bit = free;
-  // 	}
-  // 	else{
-  // 		fctb_hits++;
-  // 		pf_packet.event_cycle = fctb[fctb_search][2];
-  // 		pf_packet.free_bit = 1;
-  // 	}
 
-  // 	if(free){
-  // 		if(lad == 0)
-  // 			pf_free++;
-  // 		pf_packet.stall_cycles = 100;
-  // 	}
-  // 	else{
-  // 		if(fctb_search != -10){
-  // 			pf_free++;
-  // 			pf_packet.stall_cycles = fctb[fctb_search][3];
-  // 		}
-  // 		else{
-  // 			pf_real++;
-  // 			int stall_cycles = mmu_cache_prefetch_search(cpu, pf_addr, 0, id, ip, type, iflag);
-  // 			pf_packet.stall_cycles = stall_cycles;
+  	pf_packet.fill_level = fill_level;
+  	pf_packet.cpu = cpu;
+  	pf_packet.address = pf_addr;
+  	pf_packet.v_address = base_addr;
+  	pf_packet.ip = ip;
+  	pf_packet.type = 0xdeadbeef;
+  	pf_packet.event_cycle = current_core_cycle[cpu];
+  	pf_packet.free_bit = free;
+  	pf_packet.free_distance = free_distance;
+  	pf_packet.lad = lad;
+  	pf_packet.conf = confidence;
+  	pf_packet.irip = irip;
+    pf_packet.is_instr_addr =1;
+    pf_packet.instruction =1;
 
-  // 			int victim_entry = fctb_replacement_policy();
-  // 			fctb[victim_entry][0] = pf_addr;
-  // 			fctb[victim_entry][1] = (pf_addr & 0x07);
-  // 			fctb[victim_entry][2] = current_core_cycle[cpu];
-  // 			fctb[victim_entry][3] = stall_cycles;
-  // 		}
-  // 	}
+  	if(fctb_search == -10){
+  		fctb_misses++;
+  		pf_packet.event_cycle = current_core_cycle[cpu];
+  		pf_packet.free_bit = free;
+  	}
+  	else{
+  		fctb_hits++;
+  		pf_packet.event_cycle = fctb[fctb_search][2];
+  		pf_packet.free_bit = 1;
+  	}
 
-  // 	if(P2TLB){
-  // 		if(IS_STLB){
-  // 			uint32_t set = get_set(pf_addr);
-  // 			uint32_t way = get_way(pf_addr, set);
+  	if(free){
+  		if(lad == 0)
+  			pf_free++;
+  	}
+  	else{
+  		if(fctb_search != -10){
+  			pf_free++;
+  		}
+  		else{
+  			pf_real++;
 
-  // 			way = find_victim(cpu, 0xdeadbeef, set, block[set], 0xdeadbeef, 0xdeadbeef, 0xdeadbeef);
+  			int victim_entry = fctb_replacement_policy();
+  			fctb[victim_entry][0] = pf_addr;
+  			fctb[victim_entry][1] = (pf_addr & 0x07);
+  			fctb[victim_entry][2] = current_core_cycle[cpu];
+  			
+  		}
+  	}
 
-  // 			update_replacement_state(cpu, set, way, 0xdeadbeef, 0xdeadbeef, 0xdeadbeef, WRITEBACK, 1);
+ 
 
-  // 			block[set][way].valid = 1;
+  	if(pq_id == 0)
+      VAPQ.push_back(pf_packet);
+  	else
+  		cout << "I am using only one PQ" << endl;
 
-  // 			block[set][way].dirty = 0;
-  // 			block[set][way].prefetch = 1;
-  // 			block[set][way].used = 0;
+  	if(lad == 1)
+  		issued_prefetches_lad++;
 
-  // 			block[set][way].tag = pf_addr;
-  // 			block[set][way].address = pf_addr;
-  // 			block[set][way].full_addr = 0xdeadbeef;
-  // 			block[set][way].data = temp;
-  // 			block[set][way].cpu = cpu;
-  // 			block[set][way].stalls = pf_packet.event_cycle + pf_packet.stall_cycles;
-  // 		}
-
-  // 		return 1;
-  // 	}
-
-  // 	if(pq_id == 0)
-  // 		add_pq(&pf_packet);
-  // 	else
-  // 		cout << "I am using only one PQ" << endl;
-
-  // 	if(lad == 1)
-  // 		issued_prefetches_lad++;
-
-  // 	pf_issued++;
-  // 	return 1;
-  // }
-  // else{
-  // 	if(pq_id == 0)
-  // 		pf_swap++;
-  // 	return 0;
-  // }
+  	pf_issued++;
+  	return 1;
 }
 
 // ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
