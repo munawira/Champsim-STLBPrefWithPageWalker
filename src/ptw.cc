@@ -18,6 +18,8 @@ PageTableWalker::PageTableWalker(string v1, uint32_t cpu, unsigned fill_level, u
 {
 }
 
+
+//MUNA: check here for flow from STLB
 void PageTableWalker::handle_read()
 {
   int reads_this_cycle = MAX_READ;

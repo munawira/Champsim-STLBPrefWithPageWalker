@@ -22,9 +22,20 @@ public:
   uint32_t pf_metadata;
   uint32_t cpu = NUM_CPUS;
 
-  // MUNA: BELOW  ADDED BY MUNAWIRA
-  uint8_t instruction, is_data, is_instr_addr, is_data_addr;
-  // MUNA: ABOVE ADDED BY MUNAWIRA
+//MUNA: BELOW  ADDED BY MUNAWIRA
+  uint8_t instruction,
+        is_data,
+        is_instr_addr,
+        is_data_addr;
+
+  int signature,
+		    confidence,
+		    free_bit,
+		    free_distance,
+		    lad,
+		    irip,
+		    conf;      
+//MUNA: ABOVE ADDED BY MUNAWIRA
 
   uint64_t address = 0, v_address = 0, data = 0, instr_id = 0, ip = 0, event_cycle = std::numeric_limits<uint64_t>::max(), cycle_enqueued = 0;
 

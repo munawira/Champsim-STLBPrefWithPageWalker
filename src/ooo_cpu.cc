@@ -312,6 +312,7 @@ void O3_CPU::do_translate_fetch(champsim::circular_buffer<ooo_model_instr>::iter
   PACKET trace_packet;
   trace_packet.fill_level = ITLB_bus.lower_level->fill_level;
   trace_packet.cpu = cpu;
+  trace_packet.instruction =1;
   trace_packet.address = begin->ip;
   trace_packet.v_address = begin->ip;
   trace_packet.instr_id = begin->instr_id;
@@ -365,6 +366,7 @@ void O3_CPU::do_fetch_instruction(champsim::circular_buffer<ooo_model_instr>::it
   PACKET fetch_packet;
   fetch_packet.fill_level = L1I_bus.lower_level->fill_level;
   fetch_packet.cpu = cpu;
+  fetch_packet.instruction =1;
   fetch_packet.address = begin->instruction_pa;
   fetch_packet.data = begin->instruction_pa;
   fetch_packet.v_address = begin->ip;

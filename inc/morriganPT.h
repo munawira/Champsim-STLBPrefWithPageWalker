@@ -1,11 +1,10 @@
-// ADDED BY
-
-#include <algorithm>
-#include <cmath>
-#include <random>
-#include <vector>
+//ADDED BY 
 
 #include "cache.h"
+#include <cmath>
+#include <vector>   
+#include <algorithm>
+#include <random>
 
 #define PT_S1_SETS 128
 #define PT_S1_ASSOC 32
@@ -33,67 +32,61 @@ void reset_frequency(), show_s1(), show_s2(), show_s4(), show_s8();
 
 bool sortcol(const vector<int>& v1, const vector<int>& v2);
 
-class MARKOV_TABLE
-{
-public:
-  uint64_t vpn;
-  uint64_t timestamp; // for LRU policy
-  int freq;           // for LFU policy
-  MARKOV_TABLE()
-  {
-    vpn = 0;
-    timestamp = 0;
-    freq = 0;
-  }
+class MARKOV_TABLE{
+	public:
+		uint64_t vpn;
+		uint64_t timestamp; // for LRU policy
+		int freq; // for LFU policy
+		MARKOV_TABLE(){
+			vpn = 0;
+			timestamp = 0;
+			freq = 0;
+		}   
 };
 
-class MARKOV_S1 : public MARKOV_TABLE
-{
-public:
-  int64_t successor_delta;
-  MARKOV_S1() { successor_delta = 0; }
+class MARKOV_S1 : public MARKOV_TABLE{
+	public:
+		int64_t successor_delta;
+		MARKOV_S1(){
+			successor_delta = 0;
+		}
 };
 
-class MARKOV_S2 : public MARKOV_TABLE
-{
-public:
-  int64_t successor_delta[2];
-  int64_t confidence[2];
-  MARKOV_S2()
-  {
-    for (int i = 0; i < 2; ++i) {
-      successor_delta[i] = 0;
-      confidence[i] = 0;
-    }
-  }
+class MARKOV_S2 : public MARKOV_TABLE{
+	public:
+		int64_t successor_delta[2];
+		int64_t confidence[2];
+		MARKOV_S2(){
+			for(int i=0; i<2; ++i){
+				successor_delta[i] = 0;
+				confidence[i] = 0;
+			}
+		}
 };
 
-class MARKOV_S4 : public MARKOV_TABLE
-{
-public:
-  int64_t successor_delta[4];
-  int64_t confidence[4];
-  MARKOV_S4()
-  {
-    for (int i = 0; i < 4; ++i) {
-      successor_delta[i] = 0;
-      confidence[i] = 0;
-    }
-  }
+class MARKOV_S4 : public MARKOV_TABLE{
+	public:
+		int64_t successor_delta[4];
+		int64_t confidence[4];
+		MARKOV_S4(){
+			for(int i=0; i<4; ++i){
+				successor_delta[i] = 0;
+				confidence[i] = 0;
+			}
+		}
 };
 
-class MARKOV_S8 : public MARKOV_TABLE
-{
-public:
-  int64_t successor_delta[8];
-  int64_t confidence[8];
-  int flag; // for FIFO policy
-  MARKOV_S8()
-  {
-    for (int i = 0; i < 8; ++i) {
-      successor_delta[i] = 0;
-      confidence[i] = 0;
-    }
-    flag = 0;
-  }
+class MARKOV_S8 : public MARKOV_TABLE{
+	public:
+		int64_t successor_delta[8];
+		int64_t confidence[8];
+		int flag; // for FIFO policy
+		MARKOV_S8(){
+			for(int i=0; i<8; ++i){
+				successor_delta[i] = 0;
+				confidence[i] = 0;
+			}
+			flag = 0;
+		}
 };
+
