@@ -22,10 +22,10 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 // Free Prefetching
 
 // flag for demand page walks
-#define ENABLE_FP 0
+#define ENABLE_FP 1
 
 // flag for prefetch page walks
-#define ENABLE_PREF_FP 0
+#define ENABLE_PREF_FP 1
 
 // Lookahead Depth (0:disable)
 #define LA_DEPTH 0
@@ -58,6 +58,8 @@ extern uint32_t PAGE_TABLE_LATENCY, SWAP_LATENCY;
 
 #define FCTB_SIZE 4
 
+#define IS_STLB 2
+
 // AADDED BY MUNAWIRA FOR MORRIGAN
 //////////////////////////////////
 
@@ -71,6 +73,7 @@ class CACHE : public champsim::operable, public MemoryRequestConsumer, public Me
 public:
   uint32_t cpu;
   const std::string NAME;
+  uint8_t cache_type;
   const uint32_t NUM_SET, NUM_WAY, WQ_SIZE, RQ_SIZE, PQ_SIZE, MSHR_SIZE;
   const uint32_t HIT_LATENCY, FILL_LATENCY, OFFSET_BITS;
   std::vector<BLOCK> block{NUM_SET * NUM_WAY};
@@ -89,7 +92,8 @@ public:
   champsim::delay_queue<PACKET> RQ{RQ_SIZE, HIT_LATENCY}, // read queue
       PQ{PQ_SIZE, HIT_LATENCY},                           // prefetch queue
       VAPQ{PQ_SIZE, VA_PREFETCH_TRANSLATION_LATENCY},     // virtual address prefetch queue
-      WQ{WQ_SIZE, HIT_LATENCY};                           // write queue
+      WQ{WQ_SIZE, HIT_LATENCY},                           // write queue
+      PB{PQ_SIZE,HIT_LATENCY};
 
   std::list<PACKET> MSHR; // MSHR
 
@@ -113,7 +117,7 @@ public:
   map<uint64_t, uint64_t>::iterator it;
 
   // prefetch stats
-  uint64_t pf_hits_pq, pf_misses_pq, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
+  uint64_t pf_hits_pq, pf_misses_pq,pf_hits_pb,pf_misses_pb, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
       issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
       bpbp[5],    // 0: # instruction prefetches 1: portion of instruction prefetches that are in the same page 2: portion of beyond page boundaries instruction
                   // prefetches 3: beyond page boundaries prefetches that hit in the TLB hierarchy 4: beyond page boundaries prefetches that miss in the TLB
@@ -310,6 +314,10 @@ public:
     pf_useful = 0;
     pf_useless = 0;
     pf_fill = 0;
+
+    cout << "CACHE NAME" << NAME<< endl;
+    if (NAME == "cpu0_STLB")
+      cache_type = IS_STLB;
 
     // ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
     ////////////////////////////////////////////////

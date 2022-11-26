@@ -476,6 +476,7 @@ void CACHE::stlb_prefetcher_operate(uint64_t addr, uint64_t ip, uint8_t cache_hi
     irip_s1[index_1][victim_1].freq = 0;
     irip_s1[index_1][victim_1].successor_delta = 0;
   } else {
+    //cout << "Entry found in table" <<endl;
     uint64_t pf_page = 0;
     free_bit = 0;
     free_distance = 0;

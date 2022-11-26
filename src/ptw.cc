@@ -10,7 +10,7 @@ extern uint8_t warmup_complete[NUM_CPUS];
 PageTableWalker::PageTableWalker(string v1, uint32_t cpu, unsigned fill_level, uint32_t v2, uint32_t v3, uint32_t v4, uint32_t v5, uint32_t v6, uint32_t v7,
                                  uint32_t v8, uint32_t v9, uint32_t v10, uint32_t v11, uint32_t v12, uint32_t v13, unsigned latency, MemoryRequestConsumer* ll)
     : champsim::operable(1), MemoryRequestConsumer(fill_level), MemoryRequestProducer(ll), NAME(v1), cpu(cpu), MSHR_SIZE(v11), MAX_READ(v12),
-      MAX_FILL(v13), RQ{v10, latency}, PSCL5{"PSCL5", 4, v2, v3}, // Translation from L5->L4
+      MAX_FILL(v13), RQ{v10, latency},PQ{v10, latency}, PSCL5{"PSCL5", 4, v2, v3}, // Translation from L5->L4
       PSCL4{"PSCL4", 3, v4, v5},                                  // Translation from L5->L3
       PSCL3{"PSCL3", 2, v6, v7},                                  // Translation from L5->L2
       PSCL2{"PSCL2", 1, v8, v9},                                  // Translation from L5->L1
@@ -19,13 +19,17 @@ PageTableWalker::PageTableWalker(string v1, uint32_t cpu, unsigned fill_level, u
 }
 
 // MUNA: check here for flow from STLB
-void PageTableWalker::handle_read()
+//MUNA: Added below for Morrigan support
+void PageTableWalker::handle_prefetch()
 {
-  int reads_this_cycle = MAX_READ;
+  //cout << "Reads available in PTW prefetch" << reads_this_cycle <<endl;
+  while (reads_this_cycle > 0) {
+    if (!PQ.has_ready())
+      return;
 
-  while (reads_this_cycle > 0 && RQ.has_ready() && std::size(MSHR) != MSHR_SIZE) {
-    PACKET& handle_pkt = RQ.front();
-
+    // handle the oldest entry
+    PACKET& handle_pkt = PQ.front();
+    //cout << "Here 1" << endl;
     DP(if (warmup_complete[packet->cpu]) {
       std::cout << "[" << NAME << "] " << __func__ << " instr_id: " << handle_pkt.instr_id;
       std::cout << " address: " << std::hex << (handle_pkt.address >> LOG2_PAGE_SIZE) << " full_addr: " << handle_pkt.address;
@@ -34,7 +38,7 @@ void PageTableWalker::handle_read()
       std::cout << " translation_level: " << +handle_pkt.translation_level;
       std::cout << " event: " << handle_pkt.event_cycle << " current: " << current_cycle << std::endl;
     });
-
+    
     auto ptw_addr = splice_bits(CR3_addr, vmem.get_offset(handle_pkt.address, vmem.pt_levels - 1) * PTE_BYTES, LOG2_PAGE_SIZE);
     auto ptw_level = vmem.pt_levels - 1;
     for (auto pscl : {&PSCL5, &PSCL4, &PSCL3, &PSCL2}) {
@@ -54,6 +58,65 @@ void PageTableWalker::handle_read()
     packet.translation_level = packet.init_translation_level;
     packet.to_return = {this};
 
+    int rq_index = lower_level->add_pq(&packet);
+    if (rq_index == -2)
+      return;
+    packet.to_return = handle_pkt.to_return; // Set the return for MSHR packet same as read packet.
+    packet.type = handle_pkt.type;
+    auto it = MSHR.insert(std::end(MSHR), packet);
+    it->cycle_enqueued = current_cycle;
+    it->event_cycle = std::numeric_limits<uint64_t>::max();
+
+    // remove this entry from PQ
+    PQ.pop_front();
+    reads_this_cycle--;
+  }
+}
+
+
+
+void PageTableWalker::handle_read()
+{
+  reads_this_cycle = MAX_READ;
+
+  while (reads_this_cycle > 0 && RQ.has_ready() && std::size(MSHR) != MSHR_SIZE) {
+    PACKET& handle_pkt = RQ.front();
+    //cout << "Here 1" << endl;
+    DP(if (warmup_complete[packet->cpu]) {
+      std::cout << "[" << NAME << "] " << __func__ << " instr_id: " << handle_pkt.instr_id;
+      std::cout << " address: " << std::hex << (handle_pkt.address >> LOG2_PAGE_SIZE) << " full_addr: " << handle_pkt.address;
+      std::cout << " full_v_addr: " << handle_pkt.v_address;
+      std::cout << " data: " << handle_pkt.data << std::dec;
+      std::cout << " translation_level: " << +handle_pkt.translation_level;
+      std::cout << " event: " << handle_pkt.event_cycle << " current: " << current_cycle << std::endl;
+    });
+    
+    auto ptw_addr = splice_bits(CR3_addr, vmem.get_offset(handle_pkt.address, vmem.pt_levels - 1) * PTE_BYTES, LOG2_PAGE_SIZE);
+    auto ptw_level = vmem.pt_levels - 1;
+    for (auto pscl : {&PSCL5, &PSCL4, &PSCL3, &PSCL2}) {
+      if (auto check_addr = pscl->check_hit(handle_pkt.address); check_addr.has_value()) {
+        ptw_addr = check_addr.value();
+        ptw_level = pscl->level - 1;
+      }
+    }
+
+    PACKET packet = handle_pkt;
+    packet.fill_level = lower_level->fill_level; // This packet will be sent from L1 to PTW.
+    packet.address = ptw_addr;
+    packet.v_address = handle_pkt.address;
+    packet.cpu = cpu;
+    packet.type = TRANSLATION;
+    packet.init_translation_level = ptw_level;
+    packet.translation_level = packet.init_translation_level;
+    packet.to_return = {this};
+    
+    //(packet.is_stlb_prefetch == 1){
+        // cout<< "STLB prefetch in PTW" << endl;
+    
+    // cout << "Lower level occupancy level" << lower_level->get_occupancy(1,ptw_addr) << endl;
+    // cout << "Lower level size" << lower_level->get_size(1,ptw_addr) <<endl;
+    // }
+
     int rq_index = lower_level->add_rq(&packet);
     if (rq_index == -2)
       return;
@@ -64,7 +127,7 @@ void PageTableWalker::handle_read()
     auto it = MSHR.insert(std::end(MSHR), packet);
     it->cycle_enqueued = current_cycle;
     it->event_cycle = std::numeric_limits<uint64_t>::max();
-
+    
     RQ.pop_front();
     reads_this_cycle--;
   }
@@ -157,23 +220,87 @@ void PageTableWalker::operate()
 {
   handle_fill();
   handle_read();
+  handle_prefetch();
   RQ.operate();
+  PQ.operate();
+}
+
+int PageTableWalker::add_pq(PACKET* packet)
+{
+  assert(packet->address != 0);
+  //PQ_ACCESS++;
+
+  DP(if (warmup_complete[packet->cpu]) {
+    std::cout << "[" << NAME << "_WQ] " << __func__ << " instr_id: " << packet->instr_id << " address: " << std::hex << (packet->address >> OFFSET_BITS);
+    std::cout << " full_addr: " << packet->address << " v_address: " << packet->v_address << std::dec << " type: " << +packet->type
+              << " occupancy: " << RQ.occupancy();
+  })
+
+  // check for duplicates in the PQ
+  auto found = std::find_if(PQ.begin(), PQ.end(), eq_addr<PACKET>(packet->address, LOG2_PAGE_SIZE));
+
+  if (found != PQ.end()) {
+    DP(if (warmup_complete[packet->cpu]) std::cout << " MERGED_PQ" << std::endl;)
+
+    //PQ_MERGED++;
+    return 0;
+  }
+
+  auto found_rq = std::find_if(RQ.begin(), RQ.end(), eq_addr<PACKET>(packet->address, LOG2_PAGE_SIZE));
+  if(found_rq != RQ.end()){
+      return 0;
+  }
+
+  // check occupancy
+  if (PQ.full()) {
+
+    DP(if (warmup_complete[packet->cpu]) std::cout << " FULL" << std::endl;)
+
+    //PQ_FULL++;
+    return -2; // cannot handle this request
+  }
+
+  // if there is no duplicate, add it to PQ
+  if (warmup_complete[cpu]) {
+    PQ.push_back(*packet);
+  } else {
+    PQ.push_back_ready(*packet);
+  }
+
+  // DP(if (warmup_complete[packet->cpu]) std::cout << " ADDED" << std::endl;)
+  if(packet->is_stlb_prefetch == 1){
+    // cout << "Added to PTW PQ " << packet->address << endl;
+
+  }
+ 
+
+  //PQ_TO_CACHE++;
+  return (PQ.occupancy());
 }
 
 int PageTableWalker::add_rq(PACKET* packet)
 {
+
   assert(packet->address != 0);
 
+  
   // check for duplicates in the read queue
   auto found_rq = std::find_if(RQ.begin(), RQ.end(), eq_addr<PACKET>(packet->address, LOG2_PAGE_SIZE));
-  assert(found_rq == RQ.end()); // Duplicate request should not be sent.
+  if(found_rq != RQ.end()){
+     // cout << "FOUND RQ ADDRESS " << packet->address <<endl;
+      return 0;
+  }
+  
+  //assert(found_rq == RQ.end()); // Duplicate request should not be sent.
 
   // check occupancy
   if (RQ.full()) {
     return -2; // cannot handle this request
   }
+ 
 
   // if there is no duplicate, add it to RQ
+  //cout << "Added to RQ" << endl;
   RQ.push_back(*packet);
 
   return RQ.occupancy();

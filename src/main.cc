@@ -88,13 +88,19 @@ void print_roi_stats(uint32_t cpu, CACHE* cache)
     cout << cache->NAME;
     cout << " TRANSLATION ACCESS: " << setw(10) << cache->roi_access[cpu][4] << "  HIT: " << setw(10) << cache->roi_hit[cpu][4] << "  MISS: " << setw(10)
          << cache->roi_miss[cpu][4] << endl;
-
+   
+    cout << cache->NAME;
+    cout << " PF_HITS_PQ " << setw(10) << cache->pf_hits_pq << "  PF_MISSES_PQ" << setw(10) << cache->pf_misses_pq << endl;
+       
+   
     cout << cache->NAME;
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
     cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
 
     cout << cache->NAME;
     cout << " AVERAGE MISS LATENCY: " << (1.0 * (cache->total_miss_latency)) / TOTAL_MISS << " cycles" << endl;
+   
+   
     // cout << " AVERAGE MISS LATENCY: " <<
     // (cache->total_miss_latency)/TOTAL_MISS << " cycles " <<
     // cache->total_miss_latency << "/" << TOTAL_MISS<< endl;

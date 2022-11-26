@@ -21,6 +21,8 @@
 #define DP(x)
 #endif
 
+#define MORRIGAN 0
+
 // CACHE
 #define INFLIGHT 1
 #define COMPLETED 2

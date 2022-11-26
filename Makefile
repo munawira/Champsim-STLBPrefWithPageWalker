@@ -1,7 +1,7 @@
 CC := gcc
 CXX := g++
-CFLAGS := -Wall -O3 -std=gnu99
-CXXFLAGS := -Wall -O3 -std=c++17
+CFLAGS := -Wall -O3 -g -std=gnu99
+CXXFLAGS := -Wall -O3 -g -std=c++17
 CPPFLAGS :=  -Iinc -MMD -MP
 LDFLAGS := 
 LDLIBS := 

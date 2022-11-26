@@ -37,8 +37,10 @@ public:
   const std::string NAME;
   const uint32_t cpu;
   const uint32_t MSHR_SIZE, MAX_READ, MAX_FILL;
+  uint32_t reads_this_cycle;
 
   champsim::delay_queue<PACKET> RQ;
+  champsim::delay_queue<PACKET> PQ;
 
   std::list<PACKET> MSHR;
 
@@ -55,13 +57,14 @@ public:
   // functions
   int add_rq(PACKET* packet) override;
   int add_wq(PACKET* packet) override { assert(0); }
-  int add_pq(PACKET* packet) override { assert(0); }
-
+ // int add_pq(PACKET* packet) override { assert(0); }
+  int add_pq(PACKET* packet) override;
   void return_data(PACKET* packet) override;
   void operate() override;
 
   void handle_read();
   void handle_fill();
+  void handle_prefetch();
 
   uint32_t get_occupancy(uint8_t queue_type, uint64_t address) override;
   uint32_t get_size(uint8_t queue_type, uint64_t address) override;
