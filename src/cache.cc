@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <iterator>
 
-#include "bits/stdc++.h"
 #include "champsim.h"
 #include "champsim_constants.h"
 #include "util.h"
 #include "vmem.h"
+#include "bits/stdc++.h"
 
 #ifndef SANITY_CHECK
 #define NDEBUG
@@ -285,22 +285,17 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 {
   int index = 0, debug = 0, flag = 0, fctb_search = -10;
   bool vapq_full = false;
-<<<<<<< HEAD
   //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
   
-=======
-  // uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
->>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
-  if (!free)
-    fctb_search = search_fctb(pf_addr);
+  if(!free)
+  	fctb_search = search_fctb(pf_addr);
 
-  if (pq_id == 0) {
-    pf_requested++;
-    pf_total_pq++;
+  if(pq_id == 0){
+  	pf_requested++;
+  	pf_total_pq++;
   }
 
-<<<<<<< HEAD
   // if(pq_id == 0){
   // 	auto vapq_entry = std::find_if(PQ.begin(), VAPQ.end(), eq_addr<PACKET>(pf_addr, OFFSET_BITS));
   //   vapq_full = (VAPQ.full());
@@ -325,51 +320,14 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
   //     return 0;
   //   }
   // }
-=======
-  if (pq_id == 0) {
-    auto vapq_entry = std::find_if(VAPQ.begin(), VAPQ.end(), eq_addr<PACKET>(base_addr, OFFSET_BITS));
-    vapq_full = (VAPQ.size() == PQ_SIZE);
-    if (vapq_entry == VAPQ.end())
-      index = -1;
-  } else {
-    cout << "I am using only one PQ" << endl;
-  }
 
-  if (vapq_full) {
-    return 0;
-  }
+   	PACKET pf_packet;
 
-  if (pq_id != 2) {
-    if (index != -1) {
-      if (debug)
-        cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
-      return 0;
-    }
-  }
->>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
-  PACKET pf_packet;
-
-  pf_packet.fill_level = fill_level;
-  pf_packet.cpu = cpu;
-  pf_packet.address = pf_addr;
-  pf_packet.v_address = base_addr;
-  pf_packet.ip = ip;
-  pf_packet.type = 0xdeadbeef;
-  pf_packet.event_cycle = current_core_cycle[cpu];
-  pf_packet.free_bit = free;
-  pf_packet.free_distance = free_distance;
-  pf_packet.lad = lad;
-  pf_packet.conf = confidence;
-  pf_packet.irip = irip;
-  pf_packet.is_instr_addr = 1;
-  pf_packet.instruction = 1;
-
-<<<<<<< HEAD
-  	pf_packet.fill_level = lower_level->fill_level;
+  	pf_packet.fill_level = fill_level;
   	pf_packet.cpu = cpu;
   	pf_packet.address = pf_addr;
-  	pf_packet.v_address = base_addr;
+  	pf_packet.v_address = pf_addr;
   	pf_packet.ip = ip;
   	pf_packet.type = TRANSLATION;
   	pf_packet.event_cycle = current_core_cycle[cpu];
@@ -381,42 +339,56 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
     pf_packet.is_instr_addr =1;
     pf_packet.instruction =1;
     pf_packet.is_stlb_prefetch =1;
-    //pf_packet.to_return = this->;
 
-=======
-  if (fctb_search == -10) {
-    fctb_misses++;
-    pf_packet.event_cycle = current_core_cycle[cpu];
-    pf_packet.free_bit = free;
-  } else {
-    fctb_hits++;
-    pf_packet.event_cycle = fctb[fctb_search][2];
-    pf_packet.free_bit = 1;
-  }
->>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
-  if (free) {
-    if (lad == 0)
-      pf_free++;
-  } else {
-    if (fctb_search != -10) {
-      pf_free++;
-    } else {
-      pf_real++;
+    //pf_packet.to_return = {this};
 
-      int victim_entry = fctb_replacement_policy();
-      fctb[victim_entry][0] = pf_addr;
-      fctb[victim_entry][1] = (pf_addr & 0x07);
-      fctb[victim_entry][2] = current_core_cycle[cpu];
+    //auto it = MSHR.insert(std::end(MSHR), pf_packet);
+    // it->cycle_enqueued = current_cycle;
+    // it->event_cycle = std::numeric_limits<uint64_t>::max();
+
+
+  	if(fctb_search == -10){
+  		fctb_misses++;
+  		pf_packet.event_cycle = current_core_cycle[cpu];
+  		pf_packet.free_bit = free;
+  	}
+  	else{
+  		fctb_hits++;
+  		pf_packet.event_cycle = fctb[fctb_search][2];
+  		pf_packet.free_bit = 1;
+  	}
+
+  	if(free){
+  		if(lad == 0)
+  			pf_free++;
+  	}
+  	else{
+  		if(fctb_search != -10){
+  			pf_free++;
+  		}
+  		else{
+  			pf_real++;
+
+  			int victim_entry = fctb_replacement_policy();
+  			fctb[victim_entry][0] = pf_addr;
+  			fctb[victim_entry][1] = (pf_addr & 0x07);
+  			fctb[victim_entry][2] = current_core_cycle[cpu];
+  			
+  		}
+  	}
+
+    if(STLB_PB.size() != STLB_PB_SIZE){
+      
+
+      auto it = STLB_PB.insert(std::end(STLB_PB), pf_packet);
+      stlb_pb_added++;
+      //cout << "STLB PB INSERTED " << pf_packet.address << endl;
+      
+              
     }
-  }
 
-  if (pq_id == 0)
-    VAPQ.push_back(pf_packet);
-  else
-    cout << "I am using only one PQ" << endl;
-
-<<<<<<< HEAD
+   
  
   	if(pq_id == 0){
 
@@ -432,13 +404,6 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 
   	pf_issued++;
   	return 1;
-=======
-  if (lad == 1)
-    issued_prefetches_lad++;
-
-  pf_issued++;
-  return 1;
->>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 }
 
 // ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
@@ -450,6 +415,14 @@ void CACHE::handle_fill()
     auto fill_mshr = MSHR.begin();
     if (fill_mshr == std::end(MSHR) || fill_mshr->event_cycle > current_cycle)
       return;
+    
+    // if((fill_mshr->is_stlb_prefetch == 1) && (NAME == "cpu0_STLB")){
+    //   cout << "FILLING FOR STLB PREFETCH" << endl;
+      
+    //   auto it = STLB_PB.insert(std::end(STLB_PB),*fill_mshr);
+    //   stlb_pb_added++;
+
+    // }else{  
 
     // find victim
     uint32_t set = get_set(fill_mshr->address);
@@ -473,7 +446,7 @@ void CACHE::handle_fill()
       for (auto ret : fill_mshr->to_return)
         ret->return_data(&(*fill_mshr));
     }
-
+    
     MSHR.erase(fill_mshr);
     writes_available_this_cycle--;
   }
@@ -819,11 +792,14 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
         if (iflag == 1) {
           refresh_fctb(current_cycle);
           fctb_found_pos = search_fctb(handle_pkt.v_address);
+
+          //pa =vmem.va_to_pa(0,handle_pkt.v_address).first;
           //Search PQ replaced with this
-          auto PB_entry = std::find_if(PB.begin(), PB.end(), eq_addr<PACKET>(handle_pkt.v_address, LOG2_PAGE_SIZE));
-          bool PB_full = (PB.full());
-          answer = make_pair(PB_entry.pos, 0);
-          if (PB_entry == PB.end()){
+        
+          auto PB_entry = std::find_if(STLB_PB.begin(), STLB_PB.end(), eq_addr<PACKET>(handle_pkt.address, OFFSET_BITS));
+          //bool PB_full = (STLB_PB.size() == STLB_PB_SIZE);
+          answer = make_pair(1, 0);
+          if (PB_entry == STLB_PB.end()){
             answer = make_pair(-1, -1);
           }      
           
@@ -833,6 +809,7 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
 
         pair<uint64_t, uint64_t> v2p;
         if (answer.first == -1) {// MUNA: Not found in PB
+        //cout << "NOT FOUND IN PB" << endl;
           if (iflag) {
             if (fctb_found_pos == -10) {
               int victim_entry = fctb_replacement_policy();
@@ -842,13 +819,19 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
               fctb[victim_entry][3] = v2p.second;
             }
           }
+
           lower_level->add_rq(&handle_pkt);
           if (iflag == 1) {
             pf_misses_pb++;
           }
 
+
         } else { // Update stats in Prefetch queue, if data found in PQ
-          auto PB_entry = std::find_if(PB.begin(), PB.end(), eq_addr<PACKET>(handle_pkt.v_address, LOG2_PAGE_SIZE));
+          //cout << "FOUND IN PB" << endl;
+          pa =vmem.va_to_pa(0,handle_pkt.v_address).first;
+          
+        
+          auto PB_entry = std::find_if(STLB_PB.begin(), STLB_PB.end(), eq_addr<PACKET>(handle_pkt.address, OFFSET_BITS));
           if (PB_entry->free_bit == 1 && PB_entry->free_distance != 0) {
             rfhits[1]++;
             free_hits[PB_entry->free_distance + 6 + (PB_entry->free_distance < 0) * 1]++;
@@ -863,12 +846,16 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
             else
               sdp_hits++;
           }
-          pf_hits_pb++;
-          handle_pkt.data = PB_entry->data;
-          handle_pkt.address = PB_entry->address;
-          return_data(&handle_pkt);
 
-          cout << "Found in PB" << endl;
+          pf_hits_pb++;
+          // cout << "Found in PB" << endl;
+
+          handle_pkt.data = pa >> LOG2_PAGE_SIZE;
+          handle_pkt.to_return = {this};
+          return_data(&handle_pkt);
+          
+          STLB_PB.erase(PB_entry);
+
 
 
         }

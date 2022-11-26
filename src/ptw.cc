@@ -23,7 +23,7 @@ PageTableWalker::PageTableWalker(string v1, uint32_t cpu, unsigned fill_level, u
 void PageTableWalker::handle_prefetch()
 {
   //cout << "Reads available in PTW prefetch" << reads_this_cycle <<endl;
-  while (reads_this_cycle > 0) {
+  while (reads_this_cycle > 0 && PQ.has_ready() && std::size(MSHR) != MSHR_SIZE) {
     if (!PQ.has_ready())
       return;
 

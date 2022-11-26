@@ -90,10 +90,10 @@ void print_roi_stats(uint32_t cpu, CACHE* cache)
          << cache->roi_miss[cpu][4] << endl;
    
     cout << cache->NAME;
-    cout << " PF_HITS_PQ " << setw(10) << cache->pf_hits_pq << "  PF_MISSES_PQ" << setw(10) << cache->pf_misses_pq << endl;
+    cout << " PF_HITS_PQ " << setw(10) << cache->pf_hits_pb << "  PF_MISSES_PQ" << setw(10) << cache->pf_misses_pb <<  "  STLB PB ADDED" << setw(10) << cache->stlb_pb_added<<endl;
        
    
-    cout << cache->NAME;
+    cout << cache->NAME;   
     cout << " PREFETCH  REQUESTED: " << setw(10) << cache->pf_requested << "  ISSUED: " << setw(10) << cache->pf_issued;
     cout << "  USEFUL: " << setw(10) << cache->pf_useful << "  USELESS: " << setw(10) << cache->pf_useless << endl;
 

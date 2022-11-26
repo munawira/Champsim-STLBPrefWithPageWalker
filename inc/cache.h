@@ -74,7 +74,7 @@ public:
   uint32_t cpu;
   const std::string NAME;
   uint8_t cache_type;
-  const uint32_t NUM_SET, NUM_WAY, WQ_SIZE, RQ_SIZE, PQ_SIZE, MSHR_SIZE;
+  const uint32_t NUM_SET, NUM_WAY, WQ_SIZE, RQ_SIZE, PQ_SIZE, MSHR_SIZE, STLB_PB_SIZE;
   const uint32_t HIT_LATENCY, FILL_LATENCY, OFFSET_BITS;
   std::vector<BLOCK> block{NUM_SET * NUM_WAY};
   const uint32_t MAX_READ, MAX_WRITE;
@@ -96,6 +96,7 @@ public:
       PB{PQ_SIZE,HIT_LATENCY};
 
   std::list<PACKET> MSHR; // MSHR
+  std::list<PACKET> STLB_PB;
 
   uint64_t sim_access[NUM_CPUS][NUM_TYPES] = {}, sim_hit[NUM_CPUS][NUM_TYPES] = {}, sim_miss[NUM_CPUS][NUM_TYPES] = {}, roi_access[NUM_CPUS][NUM_TYPES] = {},
            roi_hit[NUM_CPUS][NUM_TYPES] = {}, roi_miss[NUM_CPUS][NUM_TYPES] = {};
@@ -117,7 +118,7 @@ public:
   map<uint64_t, uint64_t>::iterator it;
 
   // prefetch stats
-  uint64_t pf_hits_pq, pf_misses_pq,pf_hits_pb,pf_misses_pb, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
+  uint64_t pf_hits_pq, pf_misses_pq,pf_hits_pb,pf_misses_pb,stlb_pb_added, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
       issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
       bpbp[5],    // 0: # instruction prefetches 1: portion of instruction prefetches that are in the same page 2: portion of beyond page boundaries instruction
                   // prefetches 3: beyond page boundaries prefetches that hit in the TLB hierarchy 4: beyond page boundaries prefetches that miss in the TLB
@@ -222,7 +223,7 @@ public:
         uint32_t fill_lat, uint32_t max_read, uint32_t max_write, std::size_t offset_bits, bool pref_load, bool wq_full_addr, bool va_pref,
         unsigned pref_act_mask, MemoryRequestConsumer* ll, pref_t pref, repl_t repl)
       : champsim::operable(freq_scale), MemoryRequestConsumer(fill_level), MemoryRequestProducer(ll), NAME(v1), NUM_SET(v2), NUM_WAY(v3), WQ_SIZE(v5),
-        RQ_SIZE(v6), PQ_SIZE(v7), MSHR_SIZE(v8), HIT_LATENCY(hit_lat), FILL_LATENCY(fill_lat), OFFSET_BITS(offset_bits), MAX_READ(max_read),
+        RQ_SIZE(v6), PQ_SIZE(v7), MSHR_SIZE(v8),STLB_PB_SIZE(v7), HIT_LATENCY(hit_lat), FILL_LATENCY(fill_lat), OFFSET_BITS(offset_bits), MAX_READ(max_read),
         MAX_WRITE(max_write), prefetch_as_load(pref_load), match_offset_bits(wq_full_addr), virtual_prefetch(va_pref), pref_activate_mask(pref_act_mask),
         repl_type(repl), pref_type(pref)
   {
@@ -282,6 +283,9 @@ public:
 
     pf_hits_pq = 0;
     pf_misses_pq = 0;
+    pf_hits_pb = 0;
+    pf_misses_pb = 0;
+    stlb_pb_added = 0;
     pf_swap = 0;
     pf_dupli = 0;
     pf_free = 0;
