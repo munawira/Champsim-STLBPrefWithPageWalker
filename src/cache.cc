@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <iterator>
 
+#include "bits/stdc++.h"
 #include "champsim.h"
 #include "champsim_constants.h"
 #include "util.h"
 #include "vmem.h"
-#include "bits/stdc++.h"
 
 #ifndef SANITY_CHECK
 #define NDEBUG
@@ -285,17 +285,22 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 {
   int index = 0, debug = 0, flag = 0, fctb_search = -10;
   bool vapq_full = false;
+<<<<<<< HEAD
   //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
   
+=======
+  // uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
+>>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
-  if(!free)
-  	fctb_search = search_fctb(pf_addr);
+  if (!free)
+    fctb_search = search_fctb(pf_addr);
 
-  if(pq_id == 0){
-  	pf_requested++;
-  	pf_total_pq++;
+  if (pq_id == 0) {
+    pf_requested++;
+    pf_total_pq++;
   }
 
+<<<<<<< HEAD
   // if(pq_id == 0){
   // 	auto vapq_entry = std::find_if(PQ.begin(), VAPQ.end(), eq_addr<PACKET>(pf_addr, OFFSET_BITS));
   //   vapq_full = (VAPQ.full());
@@ -320,10 +325,47 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
   //     return 0;
   //   }
   // }
+=======
+  if (pq_id == 0) {
+    auto vapq_entry = std::find_if(VAPQ.begin(), VAPQ.end(), eq_addr<PACKET>(base_addr, OFFSET_BITS));
+    vapq_full = (VAPQ.size() == PQ_SIZE);
+    if (vapq_entry == VAPQ.end())
+      index = -1;
+  } else {
+    cout << "I am using only one PQ" << endl;
+  }
 
-   	PACKET pf_packet;
+  if (vapq_full) {
+    return 0;
+  }
 
+  if (pq_id != 2) {
+    if (index != -1) {
+      if (debug)
+        cout << "Duplicate in the Prefetch Queue: " << pf_addr << endl;
+      return 0;
+    }
+  }
+>>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
+  PACKET pf_packet;
+
+  pf_packet.fill_level = fill_level;
+  pf_packet.cpu = cpu;
+  pf_packet.address = pf_addr;
+  pf_packet.v_address = base_addr;
+  pf_packet.ip = ip;
+  pf_packet.type = 0xdeadbeef;
+  pf_packet.event_cycle = current_core_cycle[cpu];
+  pf_packet.free_bit = free;
+  pf_packet.free_distance = free_distance;
+  pf_packet.lad = lad;
+  pf_packet.conf = confidence;
+  pf_packet.irip = irip;
+  pf_packet.is_instr_addr = 1;
+  pf_packet.instruction = 1;
+
+<<<<<<< HEAD
   	pf_packet.fill_level = lower_level->fill_level;
   	pf_packet.cpu = cpu;
   	pf_packet.address = pf_addr;
@@ -341,37 +383,40 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
     pf_packet.is_stlb_prefetch =1;
     //pf_packet.to_return = this->;
 
+=======
+  if (fctb_search == -10) {
+    fctb_misses++;
+    pf_packet.event_cycle = current_core_cycle[cpu];
+    pf_packet.free_bit = free;
+  } else {
+    fctb_hits++;
+    pf_packet.event_cycle = fctb[fctb_search][2];
+    pf_packet.free_bit = 1;
+  }
+>>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 
-  	if(fctb_search == -10){
-  		fctb_misses++;
-  		pf_packet.event_cycle = current_core_cycle[cpu];
-  		pf_packet.free_bit = free;
-  	}
-  	else{
-  		fctb_hits++;
-  		pf_packet.event_cycle = fctb[fctb_search][2];
-  		pf_packet.free_bit = 1;
-  	}
+  if (free) {
+    if (lad == 0)
+      pf_free++;
+  } else {
+    if (fctb_search != -10) {
+      pf_free++;
+    } else {
+      pf_real++;
 
-  	if(free){
-  		if(lad == 0)
-  			pf_free++;
-  	}
-  	else{
-  		if(fctb_search != -10){
-  			pf_free++;
-  		}
-  		else{
-  			pf_real++;
+      int victim_entry = fctb_replacement_policy();
+      fctb[victim_entry][0] = pf_addr;
+      fctb[victim_entry][1] = (pf_addr & 0x07);
+      fctb[victim_entry][2] = current_core_cycle[cpu];
+    }
+  }
 
-  			int victim_entry = fctb_replacement_policy();
-  			fctb[victim_entry][0] = pf_addr;
-  			fctb[victim_entry][1] = (pf_addr & 0x07);
-  			fctb[victim_entry][2] = current_core_cycle[cpu];
-  			
-  		}
-  	}
+  if (pq_id == 0)
+    VAPQ.push_back(pf_packet);
+  else
+    cout << "I am using only one PQ" << endl;
 
+<<<<<<< HEAD
  
   	if(pq_id == 0){
 
@@ -387,6 +432,13 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 
   	pf_issued++;
   	return 1;
+=======
+  if (lad == 1)
+    issued_prefetches_lad++;
+
+  pf_issued++;
+  return 1;
+>>>>>>> a053545ea4059513ca17fd0630716ee0c7dcd052
 }
 
 // ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
