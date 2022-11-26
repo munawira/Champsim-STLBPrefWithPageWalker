@@ -15,7 +15,7 @@
 
 extern VirtualMemory vmem;
 extern uint8_t warmup_complete[NUM_CPUS];
-int first_access =1;
+int first_access = 1;
 
 ////////////////////////////////////////////////
 // ADDED below BY MUNAWIRA FOR MORRIGAN PREFETCHER
@@ -286,7 +286,7 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
   int index = 0, debug = 0, flag = 0, fctb_search = -10;
   bool vapq_full = false;
 <<<<<<< HEAD
-  //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
+  // uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
   
 =======
   // uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
@@ -366,22 +366,22 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
   pf_packet.instruction = 1;
 
 <<<<<<< HEAD
-  	pf_packet.fill_level = lower_level->fill_level;
-  	pf_packet.cpu = cpu;
-  	pf_packet.address = pf_addr;
-  	pf_packet.v_address = base_addr;
-  	pf_packet.ip = ip;
-  	pf_packet.type = TRANSLATION;
-  	pf_packet.event_cycle = current_core_cycle[cpu];
-  	pf_packet.free_bit = free;
-  	pf_packet.free_distance = free_distance;
-  	pf_packet.lad = lad;
-  	pf_packet.conf = confidence;
-  	pf_packet.irip = irip;
-    pf_packet.is_instr_addr =1;
-    pf_packet.instruction =1;
-    pf_packet.is_stlb_prefetch =1;
-    //pf_packet.to_return = this->;
+  pf_packet.fill_level = lower_level->fill_level;
+  pf_packet.cpu = cpu;
+  pf_packet.address = pf_addr;
+  pf_packet.v_address = base_addr;
+  pf_packet.ip = ip;
+  pf_packet.type = TRANSLATION;
+  pf_packet.event_cycle = current_core_cycle[cpu];
+  pf_packet.free_bit = free;
+  pf_packet.free_distance = free_distance;
+  pf_packet.lad = lad;
+  pf_packet.conf = confidence;
+  pf_packet.irip = irip;
+  pf_packet.is_instr_addr = 1;
+  pf_packet.instruction = 1;
+  pf_packet.is_stlb_prefetch = 1;
+  // pf_packet.to_return = this->;
 
 =======
   if (fctb_search == -10) {
@@ -417,21 +417,21 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
     cout << "I am using only one PQ" << endl;
 
 <<<<<<< HEAD
- 
-  	if(pq_id == 0){
 
-      //cout<< "ADD PQ " <<endl;
-      lower_level->add_pq(&pf_packet);
-     //add_pq(&pf_packet);
-     // VAPQ.push_back(pf_packet);
-    }else
-  		cout << "I am using only one PQ" << endl;
+  if (pq_id == 0) {
 
-  	if(lad == 1)
-  		issued_prefetches_lad++;
+    // cout<< "ADD PQ " <<endl;
+    lower_level->add_pq(&pf_packet);
+    // add_pq(&pf_packet);
+    //  VAPQ.push_back(pf_packet);
+  } else
+    cout << "I am using only one PQ" << endl;
 
-  	pf_issued++;
-  	return 1;
+  if (lad == 1)
+    issued_prefetches_lad++;
+
+  pf_issued++;
+  return 1;
 =======
   if (lad == 1)
     issued_prefetches_lad++;
@@ -569,7 +569,7 @@ void CACHE::handle_prefetch()
   while (reads_available_this_cycle > 0) {
     if (!PQ.has_ready())
       return;
-    
+
     // handle the oldest entry
     PACKET& handle_pkt = PQ.front();
 
@@ -578,12 +578,12 @@ void CACHE::handle_prefetch()
 
     if (way < NUM_WAY) // HIT
     {
-      if(handle_pkt.is_stlb_prefetch)
-          pf_hits_pq++;
+      if (handle_pkt.is_stlb_prefetch)
+        pf_hits_pq++;
       readlike_hit(set, way, handle_pkt);
     } else {
-      if(handle_pkt.is_stlb_prefetch)
-          pf_misses_pq++;
+      if (handle_pkt.is_stlb_prefetch)
+        pf_misses_pq++;
       bool success = readlike_miss(handle_pkt);
       if (!success)
         return;
@@ -778,19 +778,17 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
 
     if (!is_read) {
       lower_level->add_pq(&handle_pkt);
-   
+
     } else {
- 
-      if ((this->NAME == "cpu0_STLB") && MORRIGAN && (handle_pkt.instruction!=0))
+
+      if ((this->NAME == "cpu0_STLB") && MORRIGAN && (handle_pkt.instruction != 0))
         morrigan_engage = true;
 
-
-      if(!morrigan_engage){
-         lower_level->add_rq(&handle_pkt);
+      if (!morrigan_engage) {
+        lower_level->add_rq(&handle_pkt);
       } else { // Only if Instruction STLB Miss and Morrigan Activated, This part of the code will engage
-      //Handle to call only if DSTLB      // MUNA: BELOW ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
-     
-        
+               // Handle to call only if DSTLB      // MUNA: BELOW ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+
         uint64_t pa, current_vpn = handle_pkt.v_address;
         int bits, rowhit = -1, victim, iflag = 0;
         pair<int, int> answer;
@@ -819,20 +817,20 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
         if (iflag == 1) {
           refresh_fctb(current_cycle);
           fctb_found_pos = search_fctb(handle_pkt.v_address);
-          //Search PQ replaced with this
+          // Search PQ replaced with this
           auto PB_entry = std::find_if(PB.begin(), PB.end(), eq_addr<PACKET>(handle_pkt.v_address, LOG2_PAGE_SIZE));
           bool PB_full = (PB.full());
           answer = make_pair(PB_entry.pos, 0);
-          if (PB_entry == PB.end()){
+          if (PB_entry == PB.end()) {
             answer = make_pair(-1, -1);
-          }      
-          
+          }
+
         } else {
           answer = make_pair(-1, -1);
         }
 
         pair<uint64_t, uint64_t> v2p;
-        if (answer.first == -1) {// MUNA: Not found in PB
+        if (answer.first == -1) { // MUNA: Not found in PB
           if (iflag) {
             if (fctb_found_pos == -10) {
               int victim_entry = fctb_replacement_policy();
@@ -869,11 +867,9 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
           return_data(&handle_pkt);
 
           cout << "Found in PB" << endl;
-
-
         }
         if (iflag == 1) {
-          //cout<<"We're in STLB MISS 5" << endl;
+          // cout<<"We're in STLB MISS 5" << endl;
           free_indexes = sorted_free_distances();
           stlb_prefetcher_operate(handle_pkt.v_address, handle_pkt.ip, 0, handle_pkt.type, answer.first, warmup_complete[cpu], free_indexes,
                                   handle_pkt.instr_id, iflag);
@@ -1102,13 +1098,13 @@ void CACHE::va_translate_prefetches()
 {
   int result = -2;
   if (this->NAME == "cpu0_STLB" && MORRIGAN) { // Page Walker goes through read queue
-    if (!VAPQ.empty()){
+    if (!VAPQ.empty()) {
       cout << "VAPQ Address:" << VAPQ.front().address;
       result = lower_level->add_rq(&VAPQ.front());
       VAPQ.pop_front();
     }
-        if (result > 0)
-        pf_issued++;
+    if (result > 0)
+      pf_issued++;
 
   } else {
 
@@ -1185,11 +1181,9 @@ int CACHE::add_pq(PACKET* packet)
   }
 
   // DP(if (warmup_complete[packet->cpu]) std::cout << " ADDED" << std::endl;)
-  if(packet->is_stlb_prefetch == 1){
+  if (packet->is_stlb_prefetch == 1) {
     // cout << "Added to PQ " << packet->address << endl;
-
   }
- 
 
   PQ_TO_CACHE++;
   return (PQ.occupancy());

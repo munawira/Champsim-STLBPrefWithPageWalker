@@ -93,7 +93,7 @@ public:
       PQ{PQ_SIZE, HIT_LATENCY},                           // prefetch queue
       VAPQ{PQ_SIZE, VA_PREFETCH_TRANSLATION_LATENCY},     // virtual address prefetch queue
       WQ{WQ_SIZE, HIT_LATENCY},                           // write queue
-      PB{PQ_SIZE,HIT_LATENCY};
+      PB{PQ_SIZE, HIT_LATENCY};
 
   std::list<PACKET> MSHR; // MSHR
 
@@ -117,8 +117,8 @@ public:
   map<uint64_t, uint64_t>::iterator it;
 
   // prefetch stats
-  uint64_t pf_hits_pq, pf_misses_pq,pf_hits_pb,pf_misses_pb, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
-      issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
+  uint64_t pf_hits_pq, pf_misses_pq, pf_hits_pb, pf_misses_pb, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses,
+      hit_prefetches_lad, issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
       bpbp[5],    // 0: # instruction prefetches 1: portion of instruction prefetches that are in the same page 2: portion of beyond page boundaries instruction
                   // prefetches 3: beyond page boundaries prefetches that hit in the TLB hierarchy 4: beyond page boundaries prefetches that miss in the TLB
       instr_miss, // Added by Munawira
@@ -315,7 +315,7 @@ public:
     pf_useless = 0;
     pf_fill = 0;
 
-    cout << "CACHE NAME" << NAME<< endl;
+    cout << "CACHE NAME" << NAME << endl;
     if (NAME == "cpu0_STLB")
       cache_type = IS_STLB;
 
