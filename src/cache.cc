@@ -3,11 +3,11 @@
 #include <algorithm>
 #include <iterator>
 
+#include "bits/stdc++.h"
 #include "champsim.h"
 #include "champsim_constants.h"
 #include "util.h"
 #include "vmem.h"
-#include "bits/stdc++.h"
 
 #ifndef SANITY_CHECK
 #define NDEBUG
@@ -15,7 +15,7 @@
 
 extern VirtualMemory vmem;
 extern uint8_t warmup_complete[NUM_CPUS];
-int first_access =1;
+int first_access = 1;
 
 ////////////////////////////////////////////////
 // ADDED below BY MUNAWIRA FOR MORRIGAN PREFETCHER
@@ -285,15 +285,14 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 {
   int index = 0, debug = 0, flag = 0, fctb_search = -10;
   bool vapq_full = false;
-  //uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
-  
+  // uint64_t temp = va_to_pa_prefetch(cpu, base_addr, pf_addr), foo;
 
-  if(!free)
-  	fctb_search = search_fctb(pf_addr);
+  if (!free)
+    fctb_search = search_fctb(pf_addr);
 
-  if(pq_id == 0){
-  	pf_requested++;
-  	pf_total_pq++;
+  if (pq_id == 0) {
+    pf_requested++;
+    pf_total_pq++;
   }
 
   // if(pq_id == 0){
@@ -321,89 +320,77 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
   //   }
   // }
 
-   	PACKET pf_packet;
+  PACKET pf_packet;
 
+  pf_packet.fill_level = fill_level;
+  pf_packet.cpu = cpu;
+  pf_packet.address = pf_addr;
+  pf_packet.v_address = pf_addr;
+  pf_packet.ip = ip;
+  pf_packet.type = TRANSLATION;
+  pf_packet.event_cycle = current_core_cycle[cpu];
+  pf_packet.free_bit = free;
+  pf_packet.free_distance = free_distance;
+  pf_packet.lad = lad;
+  pf_packet.conf = confidence;
+  pf_packet.irip = irip;
+  pf_packet.is_instr_addr = 1;
+  pf_packet.instruction = 1;
+  pf_packet.is_stlb_prefetch = 1;
 
-  	pf_packet.fill_level = fill_level;
-  	pf_packet.cpu = cpu;
-  	pf_packet.address = pf_addr;
-  	pf_packet.v_address = pf_addr;
-  	pf_packet.ip = ip;
-  	pf_packet.type = TRANSLATION;
-  	pf_packet.event_cycle = current_core_cycle[cpu];
-  	pf_packet.free_bit = free;
-  	pf_packet.free_distance = free_distance;
-  	pf_packet.lad = lad;
-  	pf_packet.conf = confidence;
-  	pf_packet.irip = irip;
-    pf_packet.is_instr_addr =1;
-    pf_packet.instruction =1;
-    pf_packet.is_stlb_prefetch =1;
+  // pf_packet.to_return = {this};
 
+  // auto it = MSHR.insert(std::end(MSHR), pf_packet);
+  //  it->cycle_enqueued = current_cycle;
+  //  it->event_cycle = std::numeric_limits<uint64_t>::max();
 
-    //pf_packet.to_return = {this};
+  if (fctb_search == -10) {
+    fctb_misses++;
+    pf_packet.event_cycle = current_core_cycle[cpu];
+    pf_packet.free_bit = free;
+  } else {
+    fctb_hits++;
+    pf_packet.event_cycle = fctb[fctb_search][2];
+    pf_packet.free_bit = 1;
+  }
 
-    //auto it = MSHR.insert(std::end(MSHR), pf_packet);
-    // it->cycle_enqueued = current_cycle;
-    // it->event_cycle = std::numeric_limits<uint64_t>::max();
+  if (free) {
+    if (lad == 0)
+      pf_free++;
+  } else {
+    if (fctb_search != -10) {
+      pf_free++;
+    } else {
+      pf_real++;
 
-
-  	if(fctb_search == -10){
-  		fctb_misses++;
-  		pf_packet.event_cycle = current_core_cycle[cpu];
-  		pf_packet.free_bit = free;
-  	}
-  	else{
-  		fctb_hits++;
-  		pf_packet.event_cycle = fctb[fctb_search][2];
-  		pf_packet.free_bit = 1;
-  	}
-
-  	if(free){
-  		if(lad == 0)
-  			pf_free++;
-  	}
-  	else{
-  		if(fctb_search != -10){
-  			pf_free++;
-  		}
-  		else{
-  			pf_real++;
-
-  			int victim_entry = fctb_replacement_policy();
-  			fctb[victim_entry][0] = pf_addr;
-  			fctb[victim_entry][1] = (pf_addr & 0x07);
-  			fctb[victim_entry][2] = current_core_cycle[cpu];
-  			
-  		}
-  	}
-
-    if(STLB_PB.size() != STLB_PB_SIZE){
-      
-
-      auto it = STLB_PB.insert(std::end(STLB_PB), pf_packet);
-      stlb_pb_added++;
-      //cout << "STLB PB INSERTED " << pf_packet.address << endl;
-      
-              
+      int victim_entry = fctb_replacement_policy();
+      fctb[victim_entry][0] = pf_addr;
+      fctb[victim_entry][1] = (pf_addr & 0x07);
+      fctb[victim_entry][2] = current_core_cycle[cpu];
     }
+  }
 
-   
- 
-  	if(pq_id == 0){
+  if (STLB_PB.size() != STLB_PB_SIZE) {
 
-      //cout<< "ADD PQ " <<endl;
-      lower_level->add_pq(&pf_packet);
-     //add_pq(&pf_packet);
-     // VAPQ.push_back(pf_packet);
-    }else
-  		cout << "I am using only one PQ" << endl;
+    auto it = STLB_PB.insert(std::end(STLB_PB), pf_packet);
+    stlb_pb_added++;
+    // cout << "STLB PB INSERTED " << pf_packet.address << endl;
+  }
 
-  	if(lad == 1)
-  		issued_prefetches_lad++;
+  if (pq_id == 0) {
 
-  	pf_issued++;
-  	return 1;
+    // cout<< "ADD PQ " <<endl;
+    lower_level->add_pq(&pf_packet);
+    // add_pq(&pf_packet);
+    //  VAPQ.push_back(pf_packet);
+  } else
+    cout << "I am using only one PQ" << endl;
+
+  if (lad == 1)
+    issued_prefetches_lad++;
+
+  pf_issued++;
+  return 1;
 }
 
 // ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
@@ -415,14 +402,14 @@ void CACHE::handle_fill()
     auto fill_mshr = MSHR.begin();
     if (fill_mshr == std::end(MSHR) || fill_mshr->event_cycle > current_cycle)
       return;
-    
+
     // if((fill_mshr->is_stlb_prefetch == 1) && (NAME == "cpu0_STLB")){
     //   cout << "FILLING FOR STLB PREFETCH" << endl;
-      
+
     //   auto it = STLB_PB.insert(std::end(STLB_PB),*fill_mshr);
     //   stlb_pb_added++;
 
-    // }else{  
+    // }else{
 
     // find victim
     uint32_t set = get_set(fill_mshr->address);
@@ -446,7 +433,7 @@ void CACHE::handle_fill()
       for (auto ret : fill_mshr->to_return)
         ret->return_data(&(*fill_mshr));
     }
-    
+
     MSHR.erase(fill_mshr);
     writes_available_this_cycle--;
   }
@@ -542,7 +529,7 @@ void CACHE::handle_prefetch()
   while (reads_available_this_cycle > 0) {
     if (!PQ.has_ready())
       return;
-    
+
     // handle the oldest entry
     PACKET& handle_pkt = PQ.front();
 
@@ -551,12 +538,12 @@ void CACHE::handle_prefetch()
 
     if (way < NUM_WAY) // HIT
     {
-      if(handle_pkt.is_stlb_prefetch)
-          pf_hits_pq++;
+      if (handle_pkt.is_stlb_prefetch)
+        pf_hits_pq++;
       readlike_hit(set, way, handle_pkt);
     } else {
-      if(handle_pkt.is_stlb_prefetch)
-          pf_misses_pq++;
+      if (handle_pkt.is_stlb_prefetch)
+        pf_misses_pq++;
       bool success = readlike_miss(handle_pkt);
       if (!success)
         return;
@@ -751,19 +738,17 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
 
     if (!is_read) {
       lower_level->add_pq(&handle_pkt);
-   
+
     } else {
- 
-      if ((this->NAME == "cpu0_STLB") && MORRIGAN && (handle_pkt.instruction!=0))
+
+      if ((this->NAME == "cpu0_STLB") && MORRIGAN && (handle_pkt.instruction != 0))
         morrigan_engage = true;
 
-
-      if(!morrigan_engage){
-         lower_level->add_rq(&handle_pkt);
+      if (!morrigan_engage) {
+        lower_level->add_rq(&handle_pkt);
       } else { // Only if Instruction STLB Miss and Morrigan Activated, This part of the code will engage
-      //Handle to call only if DSTLB      // MUNA: BELOW ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
-     
-        
+               // Handle to call only if DSTLB      // MUNA: BELOW ADDED BY MUNAWIRA FOR MORRIGAN PREFETCHER
+
         uint64_t pa, current_vpn = handle_pkt.v_address;
         int bits, rowhit = -1, victim, iflag = 0;
         pair<int, int> answer;
@@ -793,23 +778,23 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
           refresh_fctb(current_cycle);
           fctb_found_pos = search_fctb(handle_pkt.v_address);
 
-          //pa =vmem.va_to_pa(0,handle_pkt.v_address).first;
-          //Search PQ replaced with this
-        
+          // pa =vmem.va_to_pa(0,handle_pkt.v_address).first;
+          // Search PQ replaced with this
+
           auto PB_entry = std::find_if(STLB_PB.begin(), STLB_PB.end(), eq_addr<PACKET>(handle_pkt.address, OFFSET_BITS));
-          //bool PB_full = (STLB_PB.size() == STLB_PB_SIZE);
+          // bool PB_full = (STLB_PB.size() == STLB_PB_SIZE);
           answer = make_pair(1, 0);
-          if (PB_entry == STLB_PB.end()){
+          if (PB_entry == STLB_PB.end()) {
             answer = make_pair(-1, -1);
-          }      
-          
+          }
+
         } else {
           answer = make_pair(-1, -1);
         }
 
         pair<uint64_t, uint64_t> v2p;
-        if (answer.first == -1) {// MUNA: Not found in PB
-        //cout << "NOT FOUND IN PB" << endl;
+        if (answer.first == -1) { // MUNA: Not found in PB
+                                  // cout << "NOT FOUND IN PB" << endl;
           if (iflag) {
             if (fctb_found_pos == -10) {
               int victim_entry = fctb_replacement_policy();
@@ -825,12 +810,10 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
             pf_misses_pb++;
           }
 
-
         } else { // Update stats in Prefetch queue, if data found in PQ
-          //cout << "FOUND IN PB" << endl;
-          pa =vmem.va_to_pa(0,handle_pkt.v_address).first;
-          
-        
+          // cout << "FOUND IN PB" << endl;
+          pa = vmem.va_to_pa(0, handle_pkt.v_address).first;
+
           auto PB_entry = std::find_if(STLB_PB.begin(), STLB_PB.end(), eq_addr<PACKET>(handle_pkt.address, OFFSET_BITS));
           if (PB_entry->free_bit == 1 && PB_entry->free_distance != 0) {
             rfhits[1]++;
@@ -853,14 +836,11 @@ bool CACHE::readlike_miss(PACKET& handle_pkt)
           handle_pkt.data = pa >> LOG2_PAGE_SIZE;
           handle_pkt.to_return = {this};
           return_data(&handle_pkt);
-          
+
           STLB_PB.erase(PB_entry);
-
-
-
         }
         if (iflag == 1) {
-          //cout<<"We're in STLB MISS 5" << endl;
+          // cout<<"We're in STLB MISS 5" << endl;
           free_indexes = sorted_free_distances();
           stlb_prefetcher_operate(handle_pkt.v_address, handle_pkt.ip, 0, handle_pkt.type, answer.first, warmup_complete[cpu], free_indexes,
                                   handle_pkt.instr_id, iflag);
@@ -1089,13 +1069,13 @@ void CACHE::va_translate_prefetches()
 {
   int result = -2;
   if (this->NAME == "cpu0_STLB" && MORRIGAN) { // Page Walker goes through read queue
-    if (!VAPQ.empty()){
+    if (!VAPQ.empty()) {
       cout << "VAPQ Address:" << VAPQ.front().address;
       result = lower_level->add_rq(&VAPQ.front());
       VAPQ.pop_front();
     }
-        if (result > 0)
-        pf_issued++;
+    if (result > 0)
+      pf_issued++;
 
   } else {
 
@@ -1172,11 +1152,9 @@ int CACHE::add_pq(PACKET* packet)
   }
 
   // DP(if (warmup_complete[packet->cpu]) std::cout << " ADDED" << std::endl;)
-  if(packet->is_stlb_prefetch == 1){
+  if (packet->is_stlb_prefetch == 1) {
     // cout << "Added to PQ " << packet->address << endl;
-
   }
- 
 
   PQ_TO_CACHE++;
   return (PQ.occupancy());
