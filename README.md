@@ -32,10 +32,10 @@ Prefetcher used in this project:
 2. L1D: "L1D_ipcp"
 3. L2C: "L2C_ipcp"
 
-The STLB Morrigan Prefetcher is enabled by default. To disable it: open champsim.h and and set "#define MORRIGAN 0" before compiling
+The STLB Morrigan Prefetcher is enabled by default. To disable it: open champsim.h file and and set "#define MORRIGAN 0" before compiling
 
 ```
-$ make
+$ make clean
 $ ./config.sh <configuration file>
 $ make
 ```
@@ -54,7 +54,7 @@ $ bin/champsim --warmup_instructions 30000000 --simulation_instructions 30000000
 ```
 
 
-Execute using following script to run for all traces.
+Execute using following script to run for all traces. You will need to mention the path to the traces.
 ```
 $ ./773TraceRun.sh
 ```
