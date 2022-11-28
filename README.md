@@ -35,6 +35,7 @@ Prefetcher used in this project:
 The STLB Morrigan Prefetcher is enabled by default. To disable it: open champsim.h and and set "#define MORRIGAN 0" before compiling
 
 ```
+$ make
 $ ./config.sh <configuration file>
 $ make
 ```
@@ -45,6 +46,7 @@ You can download the QMM traces used in the project from here: https://drive.goo
 
 
 # Run simulation
+Place the downloaded traces in the current working folder
 
 Execute the binary directly.
 ```
