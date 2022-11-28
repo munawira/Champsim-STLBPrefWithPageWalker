@@ -279,7 +279,8 @@ void CACHE::lru_pd(uint64_t timer, uint64_t address)
 int compare(const void* a, const void* b) { return (*(int*)a - *(int*)b); }
 
 uint64_t l2pf_access = 0;
-// MUNA: Study this function
+
+
 int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int fill_level, int pq_id, int free, int update_free, int free_distance,
                          uint64_t id, int type, int iflag, int lad, int confidence, int irip)
 {
@@ -383,12 +384,9 @@ int CACHE::prefetch_page(uint64_t ip, uint64_t base_addr, uint64_t pf_addr, int 
 
       auto it = STLB_PB.insert(std::end(STLB_PB), pf_packet);
       stlb_pb_added++;
-      //cout << "STLB PB INSERTED " << pf_packet.address << endl;
-      
+      //cout << "STLB PB INSERTED " << pf_packet.address << endl; 
               
     }
-
-   
  
   	if(pq_id == 0){
 

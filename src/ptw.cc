@@ -242,7 +242,7 @@ int PageTableWalker::add_pq(PACKET* packet)
   if (found != PQ.end()) {
     DP(if (warmup_complete[packet->cpu]) std::cout << " MERGED_PQ" << std::endl;)
 
-    //PQ_MERGED++;
+    PQ_MERGED++;
     return 0;
   }
 
@@ -256,7 +256,7 @@ int PageTableWalker::add_pq(PACKET* packet)
 
     DP(if (warmup_complete[packet->cpu]) std::cout << " FULL" << std::endl;)
 
-    //PQ_FULL++;
+    PQ_FULL++;
     return -2; // cannot handle this request
   }
 
@@ -267,9 +267,10 @@ int PageTableWalker::add_pq(PACKET* packet)
     PQ.push_back_ready(*packet);
   }
 
-  // DP(if (warmup_complete[packet->cpu]) std::cout << " ADDED" << std::endl;)
+
   if(packet->is_stlb_prefetch == 1){
     // cout << "Added to PTW PQ " << packet->address << endl;
+    PQ_ADDED++;
 
   }
  
