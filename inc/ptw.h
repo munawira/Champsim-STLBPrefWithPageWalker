@@ -38,7 +38,7 @@ public:
   const uint32_t cpu;
   const uint32_t MSHR_SIZE, MAX_READ, MAX_FILL;
   uint32_t reads_this_cycle;
-  uint32_t PQ_ADDED = 0, PQ_MERGED = 0, PQ_FULL = 0;
+  uint32_t PQ_ADDED=0, PQ_MERGED=0, PQ_FULL =0;
 
   champsim::delay_queue<PACKET> RQ;
   champsim::delay_queue<PACKET> PQ;
@@ -58,7 +58,7 @@ public:
   // functions
   int add_rq(PACKET* packet) override;
   int add_wq(PACKET* packet) override { assert(0); }
-  // int add_pq(PACKET* packet) override { assert(0); }
+ // int add_pq(PACKET* packet) override { assert(0); }
   int add_pq(PACKET* packet) override;
   void return_data(PACKET* packet) override;
   void operate() override;

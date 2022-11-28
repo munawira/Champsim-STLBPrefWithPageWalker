@@ -93,7 +93,7 @@ public:
       PQ{PQ_SIZE, HIT_LATENCY},                           // prefetch queue
       VAPQ{PQ_SIZE, VA_PREFETCH_TRANSLATION_LATENCY},     // virtual address prefetch queue
       WQ{WQ_SIZE, HIT_LATENCY},                           // write queue
-      PB{PQ_SIZE, HIT_LATENCY};
+      PB{PQ_SIZE,HIT_LATENCY};
 
   std::list<PACKET> MSHR; // MSHR
   std::list<PACKET> STLB_PB;
@@ -118,8 +118,8 @@ public:
   map<uint64_t, uint64_t>::iterator it;
 
   // prefetch stats
-  uint64_t pf_hits_pq, pf_misses_pq, pf_hits_pb, pf_misses_pb, stlb_pb_added, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits,
-      fctb_misses, hit_prefetches_lad, issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
+  uint64_t pf_hits_pq, pf_misses_pq,pf_hits_pb,pf_misses_pb,stlb_pb_added, pf_swap, pf_dupli, pf_free, pf_real, previous_iva, previous_ip, fctb_hits, fctb_misses, hit_prefetches_lad,
+      issued_prefetches_lad, pf_total_pq, morrigan_filter_hits, irip_hits, sdp_hits,
       bpbp[5],    // 0: # instruction prefetches 1: portion of instruction prefetches that are in the same page 2: portion of beyond page boundaries instruction
                   // prefetches 3: beyond page boundaries prefetches that hit in the TLB hierarchy 4: beyond page boundaries prefetches that miss in the TLB
       instr_miss, // Added by Munawira
@@ -223,7 +223,7 @@ public:
         uint32_t fill_lat, uint32_t max_read, uint32_t max_write, std::size_t offset_bits, bool pref_load, bool wq_full_addr, bool va_pref,
         unsigned pref_act_mask, MemoryRequestConsumer* ll, pref_t pref, repl_t repl)
       : champsim::operable(freq_scale), MemoryRequestConsumer(fill_level), MemoryRequestProducer(ll), NAME(v1), NUM_SET(v2), NUM_WAY(v3), WQ_SIZE(v5),
-        RQ_SIZE(v6), PQ_SIZE(v7), MSHR_SIZE(v8), STLB_PB_SIZE(v7), HIT_LATENCY(hit_lat), FILL_LATENCY(fill_lat), OFFSET_BITS(offset_bits), MAX_READ(max_read),
+        RQ_SIZE(v6), PQ_SIZE(v7), MSHR_SIZE(v8),STLB_PB_SIZE(v7), HIT_LATENCY(hit_lat), FILL_LATENCY(fill_lat), OFFSET_BITS(offset_bits), MAX_READ(max_read),
         MAX_WRITE(max_write), prefetch_as_load(pref_load), match_offset_bits(wq_full_addr), virtual_prefetch(va_pref), pref_activate_mask(pref_act_mask),
         repl_type(repl), pref_type(pref)
   {
@@ -319,7 +319,7 @@ public:
     pf_useless = 0;
     pf_fill = 0;
 
-    cout << "CACHE NAME" << NAME << endl;
+    cout << "CACHE NAME" << NAME<< endl;
     if (NAME == "cpu0_STLB")
       cache_type = IS_STLB;
 
