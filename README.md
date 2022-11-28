@@ -32,7 +32,7 @@ Prefetcher used in this project:
 2. L1D: "L1D_ipcp"
 3. L2C: "L2C_ipcp"
 
-
+The STLB Morrigan Prefetcher is enabled by default. To disable it: open champsim.h and and set "#define MORRIGAN 0" before compiling
 
 ```
 $ ./config.sh <configuration file>
@@ -40,8 +40,8 @@ $ make
 ```
 
 # Download QMM traces
+You can download the QMM traces used in the project from here: https://drive.google.com/drive/folders/18fr-o_Z25aKsiESczUgJUHytZ8XbxlNW?usp=sharing
 
-You can download the QMM traces used in the project from here: 
 
 
 # Run simulation
