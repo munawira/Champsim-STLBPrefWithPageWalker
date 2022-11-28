@@ -54,7 +54,7 @@ srv_s60
 
 DESTINATION_FOLDER='Statistics'
 MORRIGAN_BINARY='
-champsimno__nl_ipstride_nl
+champsim
 '
 
 
