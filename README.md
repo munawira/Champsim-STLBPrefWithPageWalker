@@ -3,46 +3,23 @@
   <p> ChampSim is a trace-based simulator for a microarchitecture study. You can sign up to the public mailing list by sending an empty mail to champsim+subscribe@googlegroups.com. If you have questions about how to use ChampSim, you can often receive a quicker response on the mailing list. Please reserve GitHub Issues for bugs. <p>
 </p>
 
-# Clone ChampSim repository
+# To Clone Baseline ChampSim repository
 ```
 git clone https://github.com/ChampSim/ChampSim.git
 ```
 
+#To clone this project
+
+```
+git clone https://github.com/munawira/Champsim-STLBPrefWithPageWalker
+```
+
+
 # Compile
 
-ChampSim takes a JSON configuration script. Examine `champsim_config.json` for a fully-specified example. All options described in this file are optional and will be replaced with defaults if not specified. The configuration scrip can also be run without input, in which case an empty file is assumed.
-```
-$ ./config.sh <configuration file>
-$ make
-```
-
-# Download DPC-3 trace
-
-Professor Daniel Jimenez at Texas A&M University kindly provided traces for the 3rd Data Prefetching Championship (DPC-3). They can be found here (http://hpca23.cse.tamu.edu/champsim-traces/speccpu). A set of traces used for the 2nd Cache Replacement Championship (CRC-2) can be found from this link. (http://bit.ly/2t2nkUj)
-
-# Run simulation
-
-Execute the binary directly.
-```
-$ bin/champsim --warmup_instructions 200000000 --simulation_instructions 500000000 ~/path/to/traces/600.perlbench_s-210B.champsimtrace.xz
-```
-
-The number of warmup and simulation instructions given will be the number of instructions retired. Note that the statistics printed at the end of the simulation include only the simulation phase.
-
-# Add your own branch predictor, data prefetchers, and replacement policy
-**Copy an empty template**
-```
-$ mkdir prefetcher/mypref
-$ cp prefetcher/no_l2c/no.cc prefetcher/mypref/mypref.cc
-```
-
-**Work on your algorithms with your favorite text editor**
-```
-$ vim prefetcher/mypref/mypref.cc
-```
-
-**Compile and test**
-Add your prefetcher to the configuration file.
+ChampSim takes a JSON configuration script. Examine `champsim_config.json` for a fully-specified example. All options described in this file are optional and will be replaced with defaults if not specified. The configuration script can also be run without input, in which case an empty file is assumed.
+For this project, if you want to use a prefetcher, add the prefetcher name in the configuration file. 
+Add the prefetcher to the configuration file like this.
 ```
 {
     "L2C": {
@@ -50,22 +27,37 @@ Add your prefetcher to the configuration file.
     }
 }
 ```
-Note that the example prefetcher is an L2 prefetcher. You might design a prefetcher for a different level.
+Prefetcher used in this project:
+1. L1I: "FNLMMA"
+2. L1D: "L1D_ipcp"
+3. L2C: "L2C_ipcp"
+
+The STLB Morrigan Prefetcher is enabled by default. To disable it: open champsim.h and and set "#define MORRIGAN 0" before compiling
 
 ```
 $ ./config.sh <configuration file>
 $ make
-$ bin/champsim --warmup_instructions 200000000 --simulation_instructions 500000000 600.perlbench_s-210B.champsimtrace.xz
 ```
 
-# How to create traces
+# Download QMM traces
+You can download the QMM traces used in the project from here: https://drive.google.com/drive/folders/18fr-o_Z25aKsiESczUgJUHytZ8XbxlNW?usp=sharing
 
-Program traces are available in a variety of locations, however, many ChampSim users wish to trace their own programs for research purposes.
-Example tracing utilities are provided in the `tracer/` directory.
 
-# Evaluate Simulation
 
-ChampSim measures the IPC (Instruction Per Cycle) value as a performance metric. <br>
-There are some other useful metrics printed out at the end of simulation. <br>
+# Run simulation
 
-Good luck and be a champion! <br>
+Execute the binary directly.
+```
+$ bin/champsim --warmup_instructions 30000000 --simulation_instructions 30000000 ~/path/to/traces/600.perlbench_s-210B.champsimtrace.xz
+```
+
+
+Execute using following script to run for all traces.
+```
+$ ./773TraceRun.sh
+```
+
+The number of warmup and simulation instructions given will be the number of instructions retired. Note that the statistics printed at the end of the simulation include only the simulation phase.
+
+
+
